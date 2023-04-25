@@ -19,10 +19,13 @@ jobs:
               with:
                   ref: main
 
-            - name: Run ZAP scan
+            - name: ZAP Scan
               uses: zaproxy/action-full-scan@v0.4.0
               with:
-                  target: "https://hitesh22rana.github.io/Spotify-Clone/"
+                  token: ${{ secrets.GITHUB_TOKEN }}
+                  docker_name: "owasp/zap2docker-stable"
+                  target: "https://youngowl13.github.io/zap/"
+                  rules_file_name: ".zap/rules.tsv"
                   cmd_options: "-a"
 
             - name: Save ZAP report
