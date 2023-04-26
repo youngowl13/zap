@@ -1,19 +1,27 @@
-on: [push]
+name: ZAP Scan
+
+on:
+  push:
+    branches: [ main ]
 
 jobs:
   zap_scan:
     runs-on: ubuntu-latest
-    name: Scan the webapplication
+    name: ZAP Scan Job
     steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-        with:
-          ref: master
-      - name: ZAP Scan
-        uses: zaproxy/action-full-scan@v0.4.0
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          docker_name: 'owasp/zap2docker-stable'
-          target: 'https://www.zaproxy.org/'
-          rules_file_name: '.zap/rules.tsv'
-          cmd_options: '-a'
+    - name: Checkout code
+      uses: actions/checkout@v2
+    - name: Install ZAP
+      run: |
+        sudo apt-get update -y
+        sudo apt-get install -y openjdk-8-jdk-headless
+        wget https://github.com/zaproxy/zaproxy/releases/download/v2.10.0/ZAP_2.10.0_Core.zip
+        unzip ZAP_2.10.0_Core.zip -d /zap
+    - name: Run ZAP Scan
+      run: |
+        /zap/ZAP_2.10.0/zap.sh -cmd -quickurl https://youngowl13.github.io/zap-test/ -htmlreport /github/workspace/report.html
+    - name: Save Report as Artifact
+      uses: actions/upload-artifact@v2
+      with:
+        name: zap-report
+        path: report.html
