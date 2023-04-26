@@ -1,27 +1,37 @@
-name: ZAP Scan
+name: Zap Scan
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
 
 jobs:
   zap_scan:
     runs-on: ubuntu-latest
-    name: ZAP Scan Job
+    name: Scan the web application
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v2
-    - name: Install ZAP
-      run: |
-        sudo apt-get update -y
-        sudo apt-get install -y openjdk-8-jdk-headless
-        wget https://github.com/zaproxy/zaproxy/releases/download/v2.10.0/ZAP_2.10.0_Core.zip
-        unzip ZAP_2.10.0_Core.zip -d /zap
-    - name: Run ZAP Scan
-      run: |
-        /zap/ZAP_2.10.0/zap.sh -cmd -quickurl https://youngowl13.github.io/zap-test/ -htmlreport /github/workspace/report.html
-    - name: Save Report as Artifact
-      uses: actions/upload-artifact@v2
-      with:
-        name: zap-report
-        path: report.html
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          ref: main
+      - name: Set up Zap CLI
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y default-jdk
+          wget https://github.com/zaproxy/zaproxy/releases/download/v2.10.0/ZAP_2.10.0_Linux.tar.gz
+          tar -xzf ZAP_2.10.0_Linux.tar.gz
+      - name: Run Zap Scan
+        run: |
+          cd ZAP_2.10.0
+          ./zap.sh -daemon -host 0.0.0.0 -port 8080 -config api.disablekey=true -config api.addrs.addr.name=.* -config api.addrs.addr.regex=true &
+          sleep 10
+          ./zap-cli -p 8080 status -t 120
+          ./zap-cli -p 8080 open-url https://youngowl13.github.io/zap-test/
+          ./zap-cli -p 8080 spider https://youngowl13.github.io/zap-test/
+          ./zap-cli -p 8080 active-scan https://youngowl13.github.io/zap-test/
+          ./zap-cli -p 8080 report -o report.html -f html
+      - name: Upload Scan Result
+        uses: actions/upload-artifact@v2
+        with:
+          name: zap-scan-report
+          path: ZAP_2.10.0/report.html
