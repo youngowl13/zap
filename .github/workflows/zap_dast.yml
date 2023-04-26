@@ -1,39 +1,24 @@
-name: Zap Scan
-
+ame: CI
 on:
   push:
-    branches:
-      - main
-
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
 jobs:
-  scan:
+  build:
+    # The type of runner that the job will run on
     runs-on: ubuntu-latest
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-
-      - name: Install Java
-        uses: actions/setup-java@v1
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v3
+      
+      - name: OWASP ZAP Baseline Scan
+        # You may pin to the exact commit or the version.
+        # uses: zaproxy/action-baseline@7cea08522cd386f6c675776d5e4296aecf61f33b
+        uses: zaproxy/action-baseline@v0.7.0
         with:
-          java-version: '11'
-
-      - name: Install Zap CLI
-        run: |
-          wget https://github.com/zaproxy/zaproxy/releases/download/v2.11.0/ZAP_2.11.0_Crossplatform.zip
-          unzip ZAP_2.11.0_Crossplatform.zip
-          cd ZAP_2.11.0_Crossplatform\ZAP_2.11.0
-          
-          chmod +x zap.sh
-
-      - name: Run Zap Scan
-        run: |
-          ./zap.sh -v --start "https://example.com"
-          ./zap.sh -v --spider "https://example.com"
-          ./zap.sh -v --active-scan "https://example.com"
-          ./zap.sh -v --export-report report.html -f html
-
-      - name: Upload report
-        uses: actions/upload-artifact@v2
-        with:
-          name: zap-report
-          path: report.html
+          # Target URL
+          target: "https://youngowl13.github.io/zap-test/"
