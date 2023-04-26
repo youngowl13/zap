@@ -6,32 +6,32 @@ on:
       - main
 
 jobs:
-  zap_scan:
+  scan:
     runs-on: ubuntu-latest
-    name: Scan the web application
     steps:
-      - name: Checkout
+      - name: Checkout code
         uses: actions/checkout@v2
+
+      - name: Install Java
+        uses: actions/setup-java@v1
         with:
-          ref: main
-      - name: Set up Zap CLI
+          java-version: '11'
+
+      - name: Install Zap CLI
         run: |
-          sudo apt-get update
-          sudo apt-get install -y default-jdk
-          wget https://github.com/zaproxy/zaproxy/releases/download/v2.10.0/ZAP_2.10.0_Linux.tar.gz
-          tar -xzf ZAP_2.10.0_Linux.tar.gz
+          wget https://github.com/zaproxy/zaproxy/releases/download/v2.11.0/ZAP_2.11.0_Crossplatform.zip
+          unzip ZAP_2.11.0_Crossplatform.zip
+          chmod +x zap-cli.py
+
       - name: Run Zap Scan
         run: |
-          cd ZAP_2.10.0
-          ./zap.sh -daemon -host 0.0.0.0 -port 8080 -config api.disablekey=true -config api.addrs.addr.name=.* -config api.addrs.addr.regex=true &
-          sleep 10
-          ./zap-cli -p 8080 status -t 120
-          ./zap-cli -p 8080 open-url https://youngowl13.github.io/zap-test/
-          ./zap-cli -p 8080 spider https://youngowl13.github.io/zap-test/
-          ./zap-cli -p 8080 active-scan https://youngowl13.github.io/zap-test/
-          ./zap-cli -p 8080 report -o report.html -f html
-      - name: Upload Scan Result
+          ./zap-cli.py -v --start "https://youngowl13.github.io/zap-test/"
+          ./zap-cli.py -v --spider "https://youngowl13.github.io/zap-test/"
+          ./zap-cli.py -v --active-scan "https://youngowl13.github.io/zap-test/"
+          ./zap-cli.py -v --export-report report.html -f html
+
+      - name: Upload report
         uses: actions/upload-artifact@v2
         with:
-          name: zap-scan-report
-          path: ZAP_2.10.0/report.html
+          name: zap-report
+          path: report.html
