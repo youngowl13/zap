@@ -22,6 +22,7 @@ jobs:
           wget https://github.com/zaproxy/zaproxy/releases/download/v2.11.0/ZAP_2.11.0_Crossplatform.zip
           unzip ZAP_2.11.0_Crossplatform.zip
           cd ZAP_2.11.0_Crossplatform\ZAP_2.11.0
+          
           chmod +x zap.sh
 
       - name: Run Zap Scan
