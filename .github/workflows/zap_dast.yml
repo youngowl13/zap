@@ -1,31 +1,37 @@
-name: ZAP Scan
+name: Zap Scan
 
-on: [push]
+on:
+  push:
+    branches:
+      - main
 
 jobs:
-  zap_scan:
+  scan:
     runs-on: ubuntu-latest
-    name: Scan the web application
     steps:
-      - name: Checkout
+      - name: Checkout code
         uses: actions/checkout@v2
-        with:
-          ref: master
 
       - name: Install Java
         uses: actions/setup-java@v1
         with:
           java-version: '11'
 
-      - name: Download and unzip ZAP
+      - name: Install Zap CLI
         run: |
-          curl -LO https://github.com/zaproxy/zaproxy/releases/download/v2.11.0/ZAP_2.11.0_Crossplatform.zip
-          unzip -q ZAP_2.11.0_Crossplatform.zip
-
-      - name: Run ZAP full scan
-        run: |
-          cd ZAP_2.11.0
+          wget https://github.com/zaproxy/zaproxy/releases/download/v2.11.0/ZAP_2.11.0_Crossplatform.zip
+          unzip ZAP_2.11.0_Crossplatform.zip
           chmod +x zap.sh
-          ./zap.sh -cmd -addoninstall ascanrulesBeta -addoninstall pscanrulesBeta -addoninstall sqliPlugin -addoninstall osCommandingPlugin -addoninstall directoryBuster -addoninstall jythonScripting
-          ./zap.sh -cmd -quickurl https://youngowl13.github.io/zap-test/ -quickprogress -quickout results.html
-        shell: bash
+
+      - name: Run Zap Scan
+        run: |
+          ./zap.sh -v --start "https://example.com"
+          ./zap.sh -v --spider "https://example.com"
+          ./zap.sh -v --active-scan "https://example.com"
+          ./zap.sh -v --export-report report.html -f html
+
+      - name: Upload report
+        uses: actions/upload-artifact@v2
+        with:
+          name: zap-report
+          path: report.html
