@@ -16,6 +16,9 @@ jobs:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v3
       
+      - name: Create output directory
+        run: mkdir -p ${{ github.workspace }}/output
+      
       - name: OWASP ZAP Baseline Scan
         # You may pin to the exact commit or the version.
         # uses: zaproxy/action-baseline@7cea08522cd386f6c675776d5e4296aecf61f33b
@@ -23,3 +26,5 @@ jobs:
         with:
           # Target URL
           target: "https://youngowl13.github.io/zap-test/"
+          # Output file
+          output: "${{ github.workspace }}/output/zap.yaml"
