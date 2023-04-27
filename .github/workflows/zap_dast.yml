@@ -27,7 +27,7 @@ jobs:
       - name: Download ZAP report artifact
         uses: actions/download-artifact@v2
         with:
-          name: ZAP Report
+          name: zap-report.html
           path: .
 
       - name: Modify ZAP report
