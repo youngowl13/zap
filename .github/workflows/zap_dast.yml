@@ -1,31 +1,54 @@
-name: OWASP ZAP DAST Scan
+name: OWASP ZAP DAST Scan and Modify HTML Report
 
 on:
- schedule:
- - cron: "30 23 * * *"
- push:
-        branches: [main]
- pull_request:
-        branches: [main]
- workflow_dispatch:
+  schedule:
+    - cron: "30 23 * * *"
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
 
 jobs:
-    dast:
-        runs-on: ubuntu-latest
-        steps:
-            - name: Checkout code
-              uses: actions/checkout@v2
-              with:
-                  ref: main
+  dast:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+        with:
+          ref: main
 
-            - name: Run ZAP scan
-              uses: zaproxy/action-full-scan@v0.4.0
-              with:
-                  target: "https://youngowl13.github.io/zap/"
-                  cmd_options: "-a"
+      - name: Run ZAP scan
+        uses: zaproxy/action-full-scan@v0.4.0
+        with:
+          target: "https://youngowl13.github.io/zap/"
+          cmd_options: "-a"
 
-            - name: Save ZAP report
-              uses: actions/upload-artifact@v2
-              with:
-                  name: ZAP Report
-                  path: zap-report.html
+      - name: Save ZAP report
+        uses: actions/upload-artifact@v2
+        with:
+          name: ZAP Report
+          path: zap-report.html
+
+      - name: Download report
+        run: |
+          curl -sL -o report.zip https://github.com/youngowl13/zap/suites/12521723141/artifacts/668358714
+        shell: bash
+
+      - name: Unzip report
+        run: |
+          unzip report.zip
+        shell: bash
+
+      - name: Modify report
+        run: |
+          sed -i 's/<head>/<head><link rel="stylesheet" href="https:\/\/storage.googleapis.com\/tm-assets\/styles\/custom.css">/' report.html
+          sed -i 's/<title>ZAP Scan Report/<title>Teachmint Scanning Report/' report.html
+          sed -i 's/<h1>ZAP Scan Report/<img src="https:\/\/storage.googleapis.com\/tm-assets\/images\/dark\/teachmint-logo-dark.svg" alt="Teachmint Logo" height="50"\/><h1>Teachmint Scanning Report/' report.html
+        shell: bash
+
+      - name: Upload new report
+        uses: actions/upload-artifact@v2
+        with:
+          name: modified-report
+          path: report.html
