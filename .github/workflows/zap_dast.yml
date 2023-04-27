@@ -1,40 +1,31 @@
 name: OWASP ZAP DAST Scan
 
 on:
-  schedule:
-    - cron: "30 23 * * *"
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
-  workflow_dispatch:
+ schedule:
+ - cron: "30 23 * * *"
+ push:
+        branches: [main]
+ pull_request:
+        branches: [main]
+ workflow_dispatch:
 
 jobs:
-  dast:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-        with:
-          ref: main
+    dast:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v2
+              with:
+                  ref: main
 
-      - name: Run ZAP scan
-        uses: docker://owasp/zap2docker-stable
-        with:
-          args: zap-full-scan.py -t https://youngowl13.github.io/zap/ -J report_json.json -w report_md.md -r report_html.html -a
+            - name: Run ZAP scan
+              uses: zaproxy/action-full-scan@v0.4.0
+              with:
+                  target: "https://youngowl13.github.io/zap/"
+                  cmd_options: "-a"
 
-      - name: Save ZAP report
-        run: |
-          /usr/bin/touch report_json.json report_md.md report_html.html
-          /usr/bin/chmod a+w report_json.json report_md.md report_html.html
-          docker cp $(docker ps -q -n=1):/zap/wrk/report_html.html report_html.html
-          sed -i 's/ZAP Scanning Report/Teachmint Scanning Report/g' report_html.html
-          sed -i 's|<h1 class="title">Teachmint Scanning Report</h1>|<img src="https://storage.googleapis.com/tm-assets/images/dark/teachmint-logo-dark.svg" width="100" height="100"><h1 class="title">Teachmint Scanning Report</h1>|g' report_html.html
-        shell: /bin/bash
-
-      - name: Upload ZAP report
-        uses: actions/upload-artifact@v2
-        with:
-          name: ZAP Report
-          path: ./report_html.html
-          if-no-files-found: warn
+            - name: Save ZAP report
+              uses: actions/upload-artifact@v2
+              with:
+                  name: ZAP Report
+                  path: zap-report.html
