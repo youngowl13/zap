@@ -1,14 +1,13 @@
 name: OWASP ZAP DAST Scan
 
 on:
-    # schedule:
-    # - cron: "15 15 * * *"
-    push:
+ schedule:
+ - cron: "30 23 * * *"
+ push:
         branches: [main]
-    pull_request:
+ pull_request:
         branches: [main]
-
-    workflow_dispatch:
+ workflow_dispatch:
 
 jobs:
     dast:
