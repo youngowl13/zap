@@ -28,13 +28,7 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: ZAP Report
-          path: zap-report.html
-
-      - name: Download ZAP report
-        uses: actions/download-artifact@v2
-        with:
-          name: ZAP Report
-          path: .
+          path: ./zap-report.html
 
       - name: Modify report heading
         run: |
@@ -45,4 +39,4 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: Modified ZAP Report
-          path: zap-report.html
+          path: ./zap-report1.html
