@@ -29,26 +29,3 @@ jobs:
         with:
           name: ZAP Report
           path: zap-report.html
-
-      - name: Download report
-        run: |
-          curl -sL -o report.zip https://github.com/youngowl13/zap/suites/12521723141/artifacts/668358714
-        shell: bash
-
-      - name: Unzip report
-        run: |
-          unzip report.zip
-        shell: bash
-
-      - name: Modify report
-        run: |
-          sed -i 's/<head>/<head><link rel="stylesheet" href="https:\/\/storage.googleapis.com\/tm-assets\/styles\/custom.css">/' report.html
-          sed -i 's/<title>ZAP Scan Report/<title>Teachmint Scanning Report/' report.html
-          sed -i 's/<h1>ZAP Scan Report/<img src="https:\/\/storage.googleapis.com\/tm-assets\/images\/dark\/teachmint-logo-dark.svg" alt="Teachmint Logo" height="50"\/><h1>Teachmint Scanning Report/' report.html
-        shell: bash
-
-      - name: Upload new report
-        uses: actions/upload-artifact@v2
-        with:
-          name: modified-report
-          path: report.html
