@@ -27,15 +27,17 @@ jobs:
       - name: Save ZAP report
         uses: actions/upload-artifact@v2
         with:
-          name: zap_scan
+          name: ZAP Report
           path: zap-report.html
-
+          
       - name: Download and unzip artifact
-        uses: actions/download-artifact@v2.1.1
+        uses: dawidd6/action-download-artifact@v2.14.0
         with:
           name: zap_scan
-          path: zap_scan.zip
+          path: .
+
       - name: Unzip artifact
         run: unzip zap_scan.zip
-      - name: Show contents of the artifact
-        run: ls -R zap_scan/
+
+      - name: Show artifact contents
+        run: ls -la
