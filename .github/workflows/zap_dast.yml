@@ -32,7 +32,7 @@ jobs:
           
       - name: Unzip artifact
         run: |
-          unzip zap_scan.zip
+          unzip -o zap_scan.zip
           
       - name: Show artifact contents
         run: |
