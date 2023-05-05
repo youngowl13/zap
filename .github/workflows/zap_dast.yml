@@ -30,14 +30,10 @@ jobs:
           name: ZAP Report
           path: zap-report.html
           
-      - name: Download and unzip artifact
-        uses: dawidd6/action-download-artifact@v2.14.0
-        with:
-          name: zap_scan
-          path: .
-
       - name: Unzip artifact
-        run: unzip zap_scan.zip
-
+        run: |
+          unzip zap_scan.zip
+          
       - name: Show artifact contents
-        run: ls -la
+        run: |
+          ls zap_scan
