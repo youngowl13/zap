@@ -1,5 +1,4 @@
 name: OWASP ZAP DAST Scan
-
 on:
   schedule:
     - cron: "30 23 * * *"
