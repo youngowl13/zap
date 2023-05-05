@@ -32,8 +32,5 @@ jobs:
       - name: Unzip artifact
         run: |
           unzip -o zap_scan.zip
-          
-      - name: Show artifact contents
-        run: |
-          sudo chmod 777 zap_scan
-          ls zap_scan
+          ls -la
+          pwd
