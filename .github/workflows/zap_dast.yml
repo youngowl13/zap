@@ -34,3 +34,4 @@ jobs:
           unzip -o zap_scan.zip
           ls -la
           pwd
+          chmod 777 report_html.html 
