@@ -33,7 +33,12 @@ jobs:
       - name: Unzip artifact
         run: |
           unzip -o zap_scan.zip
-          ls -la
           pwd
           chmod 777 report_html.html
-          ls -la
+          sed 's/ZAP Scanning Report/<img src="https:\/\/storage.googleapis.com\/tm-assets\/images\/dark\/teachmint-logo-dark.svg" width="100" height="100"\/> Teachmint Scanning Report/g' report_html.html > tmp_report_html.html && mv tmp_report_html.html report_html.html
+          
+      - name: Upload modified report artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: Modified Report
+          path: report_html.html
