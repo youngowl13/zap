@@ -30,12 +30,13 @@ jobs:
           name: ZAP Report
           path: zap-report.html
           
-      - name: Unzip artifact
+      - name: Modify ZAP report
         run: |
           unzip -o zap_scan.zip
           pwd
           chmod 777 report_html.html
-          sed -e 's/ZAP Scanning Report/Teachmint Scanning Report/g' -e 's#data:image\/png;base64,[^"]*# #g' report_html.html > report_html_new.html          
+          sed -i -e 's/ZAP Scanning Report/Teachmint Scanning Report/g' -e 's#data:image\/png;base64,[^"]*# #g' report_html.html 
+          
       - name: Upload modified report artifact
         uses: actions/upload-artifact@v2
         with:
