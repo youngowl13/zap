@@ -27,5 +27,28 @@ jobs:
       - name: Save ZAP report
         uses: actions/upload-artifact@v2
         with:
-          name: ZAP Report
+          name: zap-report
           path: zap-report.html
+
+  download-and-update-report:
+    runs-on: ubuntu-latest
+    needs: dast
+    steps:
+      - name: Download ZAP Report artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: zap-report
+          path: .
+
+      - name: Update ZAP Report
+        run: |
+          sed -i 's/ZAP Scanning Report/Teachmint Scanning Report/g' zap-report.html
+          sed -i 's|<h1 class="title">Teachmint Scanning Report</h1>|<img src="https://storage.googleapis.com/tm-assets/images/dark/teachmint-logo-dark.svg" width="100" height="100"><h1 class="title">Teachmint Scanning Report</h1>|g' zap-report.html
+        
+      - name: Upload updated ZAP Report
+        if: always()
+        uses: actions/upload-artifact@v2
+        with:
+          name: updated-zap-report
+          path: ./zap-report.html
+          if-no-files-found: error
