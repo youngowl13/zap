@@ -42,5 +42,5 @@ jobs:
       - name: Upload modified report artifact
         uses: actions/upload-artifact@v2
         with:
-          name: Modified Report
+          name: Final Report
           path: report_html.html
