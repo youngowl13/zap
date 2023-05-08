@@ -4,32 +4,27 @@ on:
   push:
     branches:
       - main
+  pull_request:
+    branches:
+      - main
 
 jobs:
   semgrep_scan:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        node-version: [16.x]
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v2
-
-    - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v2
-      with:
-        node-version: ${{ matrix.node-version }}
-      
-    - name: Install dependencies
-      run: npm ci
-
-    - name: Semgrep Scan
-      uses: returntocorp/semgrep-action@v1
-      with:
-        args: "--config=p/security-audit --html=report.html"
-
-    - name: Upload report as artifact
-      uses: actions/upload-artifact@v2
-      with:
-        name: semgrep-report
-        path: report.html
+      - uses: actions/checkout@v2
+      - name: Setup Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.8
+      - name: Install Semgrep
+        run: |
+          pip install semgrep
+      - name: Semgrep Scan
+        run: |
+          semgrep --config=p/r2c-ci . > semgrep_report.txt
+      - name: Upload Semgrep Report
+        uses: actions/upload-artifact@v2
+        with:
+          name: Semgrep Report
+          path: semgrep_report.txt
