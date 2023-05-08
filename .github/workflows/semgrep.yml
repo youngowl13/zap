@@ -24,6 +24,7 @@ jobs:
     - name: run commands
       run: |
         ls
+        sudo add-apt-repository universe
         sudo apt install -y jq
         sudo add-apt-repository ppa:linuxuprising/apps
         sudo apt-get update
