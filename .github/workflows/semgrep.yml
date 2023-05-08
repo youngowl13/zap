@@ -1,29 +1,37 @@
-- name: Run SAST Analysis via Semgrep and Reviewdog (+extras)
-  # You may pin to the exact commit or the version.
-  # uses: tsigouris007/action-semgrep-reviewdog@8d1080f941144ddb1e9bc82f0a2318455673b9a2
-  uses: tsigouris007/action-semgrep-reviewdog@v0.4
-  with:
-    # GITHUB_TOKEN.
-    github_token: 
-    # Tool name to use for reviewdog reporter
-    tool_name: # optional, default is semgrep
-    # Report level for reviewdog [info,warning,error]
-    level: # optional, default is warning
-    # Reporter of reviewdog command [github-pr-check,github-pr-review].
-Default is github-pr-check.
+name: Semgrep SAST Scan
 
-    reporter: # optional, default is github-pr-check
-    # Filtering mode for the reviewdog command [added,diff_context,file,nofilter].
-Default is added.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
 
-    filter_mode: # optional, default is added
-    # Exit code for reviewdog when errors are found [true,false]
-Default is `false`.
+jobs:
+  sast_scan:
+    runs-on: ubuntu-latest
 
-    fail_on_error: # optional, default is false
-    # Additional reviewdog flags
-    reviewdog_flags: # optional, default is 
-    # Semgrep flags
-    semgrep_flags: # optional, default is --disable-version-check --verbose --config=p/ci
-    # Custom semgrep ignore fingerprint file
-    semgrep_ignore: # optional, default is 
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Setup Semgrep
+        uses: returntocorp/semgrep-action@v1.2.2
+
+      - name: Run SAST Analysis via Semgrep and Reviewdog (+extras)
+        uses: tsigouris007/action-semgrep-reviewdog@v0.4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          tool_name: semgrep
+          level: error
+          reporter: github-pr-review
+          fail_on_error: true
+          semgrep_flags: --config=p/ci --exclude=tests/
+          reviewdog_flags: -name='Semgrep SAST Scan'
+          semgrep_ignore: .semgrepignore
+
+      - name: Upload HTML report
+        if: always()
+        uses: actions/upload-artifact@v2
+        with:
+          name: Semgrep HTML Report
+          path: semgrep_report.html
