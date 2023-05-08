@@ -21,8 +21,19 @@ jobs:
     - name: Run Semgrep
       run: semgrep --config auto -o semgrep_report.json --gitlab-sast --severity=ERROR --severity=WARNING --severity=INFO
       
-    - name: Upload Semgrep Report
+    - name: run commands
+      run: |
+        ls
+        jq '.' semgrep_report.json | pup 'pre text{}' | sed 's|<pre>|<pre><code>|g;s|</pre>|</code></pre>|g' > Final.html
+
+            
+      
+    - name: Upload all artifacts
       uses: actions/upload-artifact@v2
       with:
-        name: semgrep-report
-        path: semgrep_report.json
+        name: all-artifacts
+        path: |
+          semgrep_report.json
+          --gitlab-sast
+          Final.html
+          # add other artifacts here separated by a newline
