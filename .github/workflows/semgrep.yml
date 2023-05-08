@@ -1,5 +1,4 @@
 name: Semgrep Scan
-
 on:
   push:
     branches: [ main ]
