@@ -24,6 +24,10 @@ jobs:
     - name: run commands
       run: |
         ls
+        sudo apt install jq
+        sudo apt install npm
+        sudo npm install -g pup
+
         jq '.' semgrep_report.json | pup 'pre text{}' | sed 's|<pre>|<pre><code>|g;s|</pre>|</code></pre>|g' > Final.html
 
             
