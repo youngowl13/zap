@@ -1,20 +1,22 @@
-name: Semgrep SAST Scan
-on: [push, pull_request]
+name: Semgrep Scan
+
+on: [push]
+
 jobs:
-  sast:
+  semgrep_scan:
+    name: Semgrep Scan Job
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-      - name: Semgrep Scan
-        uses: tsigouris007/action-semgrep-reviewdog@v0.4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          tool_name: semgrep
-          level: error
-          reporter: github-pr-review
-          fail_on_error: true
-          semgrep_flags: --config=p/ci --exclude=tests/
-          reviewdog_flags: -name='Semgrep SAST Scan'
-          semgrep_ignore: .semgrepignore
-          filter_mode: added
+    - name: Checkout code
+      uses: actions/checkout@v2
+    - name: Install Semgrep
+      run: curl https://semgrep.dev/install.sh | bash
+    - name: Run Semgrep scan
+      run: semgrep --config=p/r2c-ci /github/workspace > semgrep_results.txt
+    - name: Generate HTML report
+      run: semgrep --config=p/r2c-ci --html /github/workspace/semgrep_results.html /github/workspace
+    - name: Upload report as artifact
+      uses: actions/upload-artifact@v2
+      with:
+        name: Semgrep HTML Report
+        path: /github/workspace/semgrep_results.html
