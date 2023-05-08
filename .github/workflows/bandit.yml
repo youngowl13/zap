@@ -1,6 +1,10 @@
 name: SecurityPipeline
+
 on:
   push:
+    branches:
+      - main
+
 jobs:
   horusec-security:
     name: horusec-security
@@ -9,15 +13,19 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v2
         with:
-          fetch-depth: 0
-      - name: Install Horusec
-        run: |
-          curl -fsSL https://raw.githubusercontent.com/ZupIT/horusec/main/deployments/scripts/install.sh | bash -s latest
+          fetch-depth: 0 # Required when commit authors is enabled
       - name: Running Horusec Security
         run: |
+          curl -fsSL https://raw.githubusercontent.com/ZupIT/horusec/main/deployments/scripts/install.sh | bash -s latest
           horusec start -p="./" --information-severity=true
-      - name: Save results as artifact
+      - name: Save Horusec results to file
+        run: |
+          mkdir -p horusec-results
+          cp -R .horusec/* horusec-results/
+      - name: Upload Horusec results as artifact
+        if: ${{ success() }}
         uses: actions/upload-artifact@v2
         with:
           name: horusec-results
-          path: .horusec/
+          path: horusec-results/
+          if-no-files-found: error
