@@ -15,6 +15,7 @@ jobs:
         python-version: '3.x'
     - name: Install Betterscan
       run: |
+        pip install --upgrade pip
         pip install betterscan
     - name: Run Betterscan
       run: |
