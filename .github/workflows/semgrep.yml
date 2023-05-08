@@ -1,22 +1,35 @@
 name: Semgrep Scan
 
-on: [push]
+on:
+  push:
+    branches:
+      - main
 
 jobs:
   semgrep_scan:
-    name: Semgrep Scan Job
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [16.x]
     steps:
     - name: Checkout code
       uses: actions/checkout@v2
-    - name: Install Semgrep
-      run: curl https://semgrep.dev/install.sh | bash
-    - name: Run Semgrep scan
-      run: semgrep --config=p/r2c-ci /github/workspace > semgrep_results.txt
-    - name: Generate HTML report
-      run: semgrep --config=p/r2c-ci --html /github/workspace/semgrep_results.html /github/workspace
+
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v2
+      with:
+        node-version: ${{ matrix.node-version }}
+      
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Semgrep Scan
+      uses: returntocorp/semgrep-action@v1.5.0
+      with:
+        args: "--config=p/security-audit --html=report.html"
+
     - name: Upload report as artifact
       uses: actions/upload-artifact@v2
       with:
-        name: Semgrep HTML Report
-        path: /github/workspace/semgrep_results.html
+        name: semgrep-report
+        path: report.html
