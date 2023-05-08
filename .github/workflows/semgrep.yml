@@ -1,5 +1,4 @@
 name: Semgrep SAST Scan
-
 on:
   push:
     branches: [main]
