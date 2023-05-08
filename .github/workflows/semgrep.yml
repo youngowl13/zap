@@ -1,30 +1,47 @@
-name: Semgrep Scan
+name: Semgrep Scan and Report
 
 on:
   push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
+    branches: [main]
 
 jobs:
   semgrep_scan:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v2
-      - name: Setup Python
-        uses: actions/setup-python@v2
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Setup Semgrep
+        uses: returntocorp/semgrep-action@v1.1.0
         with:
-          python-version: 3.8
-      - name: Install Semgrep
-        run: |
-          pip install semgrep
-      - name: Semgrep Scan
-        run: |
-          semgrep --config=p/r2c-ci . > semgrep_report.txt
-      - name: Upload Semgrep Report
+          config: python.lang
+
+      - name: Run Semgrep Scan
+        run: semgrep --config python.lang .
+
+      - name: Save Semgrep Results
+        id: semgrep-report
+        run: echo "::set-output name=results::$(cat results/semgrep_results.json)"
+
+      - name: Display Results Summary
+        run: echo "Semgrep found $(jq -r '.stats.num_findings' <<< "${{ steps.semgrep-report.outputs.results }}") issues"
+
+      - name: Save Semgrep Report Artifact
         uses: actions/upload-artifact@v2
         with:
-          name: Semgrep Report
-          path: semgrep_report.txt
+          name: semgrep-report
+          path: results/semgrep_results.json
+
+      - name: Generate HTML Report
+        uses: github/codeql-action/upload-sarif@v1
+        with:
+          sarif_file: results/semgrep_results.json
+          # Additional configuration can be added here if needed
+          # See https://github.com/github/codeql-action#upload-sarif for details
+
+      - name: Save HTML Report Artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: semgrep-html-report
+          path: results/semgrep-report.html
