@@ -1,22 +1,12 @@
 name: Semgrep SAST Scan
-on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
-
+on: [push, pull_request]
 jobs:
-  sast_scan:
+  sast:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
-
-      - name: Setup Semgrep
-        uses: returntocorp/semgrep-action@v1
-
-      - name: Run SAST Analysis via Semgrep and Reviewdog (+extras)
+      - name: Semgrep Scan
         uses: tsigouris007/action-semgrep-reviewdog@v0.4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -27,10 +17,4 @@ jobs:
           semgrep_flags: --config=p/ci --exclude=tests/
           reviewdog_flags: -name='Semgrep SAST Scan'
           semgrep_ignore: .semgrepignore
-
-      - name: Upload HTML report
-        if: always()
-        uses: actions/upload-artifact@v2
-        with:
-          name: Semgrep HTML Report
-          path: semgrep_report.html
+          filter_mode: added
