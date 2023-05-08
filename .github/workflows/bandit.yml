@@ -14,4 +14,12 @@ jobs:
     - name: Running Horusec Security
       run: |
         curl -fsSL https://raw.githubusercontent.com/ZupIT/horusec/main/deployments/scripts/install.sh | bash -s latest
-        horusec start -p="./" -e="true"        
+        horusec start -p="./" -e="true"
+    - name: Save results to file
+      run: |
+        horusec export html --output-file results.html
+    - name: Upload results as artifact
+      uses: actions/upload-artifact@v2
+      with:
+        name: Horusec Scan Results
+        path: results.html
