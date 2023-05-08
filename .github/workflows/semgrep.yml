@@ -1,24 +1,28 @@
+name: Semgrep Scan
+
 on:
-  workflow_dispatch: {}
-  pull_request: {}
   push:
-    branches:
-    - main
-    - master
-    paths:
-    - .github/workflows/semgrep.yml
-  schedule:
-  # random HH:MM to avoid a load spike on GitHub Actions at 00:00
-  - cron: 58 3 * * *
-name: Semgrep
+  pull_request:
+
 jobs:
-  semgrep:
-    name: semgrep/ci
-    runs-on: ubuntu-20.04
-    env:
-      SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
-    container:
-      image: returntocorp/semgrep
+  sast:
+    name: Semgrep SAST Scan
+    runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
-    - run: semgrep ci
+    - name: Checkout code
+      uses: actions/checkout@v2
+      
+    - name: Setup Python
+      uses: actions/setup-python@v2
+      
+    - name: Install Semgrep
+      run: pip install semgrep
+      
+    - name: Run Semgrep
+      run: semgrep --config auto -o semgrep_report.json --gitlab-sast --severity=ERROR --severity=WARNING --severity=INFO
+      
+    - name: Upload Semgrep Report
+      uses: actions/upload-artifact@v2
+      with:
+        name: semgrep-report
+        path: semgrep_report.json
