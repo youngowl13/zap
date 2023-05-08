@@ -24,9 +24,8 @@ jobs:
     - name: run commands
       run: |
         ls
-        sudo apt-get update
-        sudo apt-get install json2html
-        json2html --input=semgrep_report.json --output=Final.html
+        pip install json2html
+        json2html < semgrep_report.json > Final.html
 
 
             
