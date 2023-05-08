@@ -1,26 +1,30 @@
-name: Bandit Scan and Upload
+name: Betterscan Scan
+
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
+
 jobs:
-  bandit_scan_and_upload:
+  scan:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-      - name: Setup Python
-        uses: actions/setup-python@v2
-        with:
-          python-version: '3.x'
-      - name: Install dependencies
-        run: pip install bandit
-      - name: Run Bandit scan
-        run: bandit -r . -f xml -o bandit_report.xml
-      - name: Convert XML to HTML
-        run: xsltproc -o bandit_report.html /usr/share/bandit/xslt/bruteforce.xsl bandit_report.xml
-      - name: Upload report
-        uses: actions/upload-artifact@v2
-        with:
-          name: Bandit Report
-          path: bandit_report.html
+    - uses: actions/checkout@v2
+    - name: Setup Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.x'
+    - name: Install Betterscan
+      run: |
+        pip install betterscan
+    - name: Run Betterscan
+      run: |
+        betterscan scan --output-format=JSON > scan_results.json
+    - name: Convert JSON to HTML
+      run: |
+        sudo apt install jq
+        cat scan_results.json | jq -r '.[] | [.FilePath, .RuleId, .Severity, .Description] | @html "<tr><td>" + join("</td><td>") + "</td></tr>"' | awk 'BEGIN{print "<table><thead><tr><th>File Path</th><th>Rule ID</th><th>Severity</th><th>Description</th></tr></thead><tbody>"} {print} END{print "</tbody></table>"}' > scan_results.html
+    - name: Upload HTML Report
+      uses: actions/upload-artifact@v2
+      with:
+        name: Betterscan Report
+        path: scan_results.html
