@@ -1,42 +1,17 @@
-name: Security Scan
+name: SecurityPipeline
 
-on:
-  push:
-    branches:
-      - main
+on: [push]
 
 jobs:
-  build:
-
+  horusec-security:
+    name: horusec-security
     runs-on: ubuntu-latest
-
     steps:
-    - name: Checkout code
+    - name: Check out code
       uses: actions/checkout@v2
-
-    - name: Set up Python 3.x
-      uses: actions/setup-python@v2
-      with:
-        python-version: 3.x
-
-    - name: Install latest version of pip
-      run: python -m pip install --upgrade pip
-
-    - name: Install Betterscan
-      uses: topcodersonline/betterscan@v3
-
-    - name: Install Checkmate
-      run: pip install checkmate
-
-    - name: Run Checkmate to generate configuration
-      run: checkmate init
-
-    - name: Commit Checkmate configuration
+      with: # Required when commit authors is enabled
+        fetch-depth: 0
+    - name: Running Horusec Security
       run: |
-        git config --global user.email "gill21gurpreet.com"
-        git config --global user.name "game"
-        git add .checkmate
-        git commit -m "Add Checkmate configuration" || echo "No changes to commit"
-
-    - name: Run Betterscan
-      run: betterscan scan -o results.html
+        curl -fsSL https://raw.githubusercontent.com/ZupIT/horusec/main/deployments/scripts/install.sh | bash -s latest
+        horusec start -p="./" -e="true"        
