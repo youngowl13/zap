@@ -1,33 +1,26 @@
-name: SAST scan with Semgrep
+name: Semgrep Scan
 
 on:
   push:
-    branches: [main]
+    branches: [ main ]
   pull_request:
-    branches: [main]
+    branches: [ main ]
 
 jobs:
-  sast_scan:
+  semgrep-scan:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v2
 
-      - name: Setup Python
-        uses: actions/setup-python@v2
-        with:
-          python-version: 3.9
-
       - name: Install Semgrep
-        run: |
-          pip install semgrep
+        run: bash <(curl -Ls https://semgrep.dev/install.sh)
 
-      - name: SAST scan with Semgrep
-        run: semgrep . -o semgrep_report.json
+      - name: Run Semgrep Scan
+        run: semgrep --config=python.sem . -o semgrep_report.json
 
-      - name: Upload Semgrep report as artifact
+      - name: Upload Scan Results
         uses: actions/upload-artifact@v2
         with:
-          name: semgrep-report
+          name: Semgrep Report
           path: semgrep_report.json
