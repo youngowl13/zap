@@ -17,15 +17,12 @@ jobs:
       - name: Running Horusec Security
         run: |
           curl -fsSL https://raw.githubusercontent.com/ZupIT/horusec/main/deployments/scripts/install.sh | bash -s latest
-          horusec start -p="./" --information-severity=true
+          horusec start -p="./" --information-severity=true >>vulnerabilities.txt
       - name: Save Horusec results to file
         run: |
-          mkdir -p horusec-results
-          cp -R .horusec/* horusec-results/
-      - name: Upload Horusec results as artifact
-        if: ${{ success() }}
+          cat vulnerabilities.txt
+      - name: Upload report artifact
         uses: actions/upload-artifact@v2
         with:
-          name: horusec-results
-          path: horusec-results/
-          if-no-files-found: error
+          name: Final Report
+          path: vulnerabilities.txt
