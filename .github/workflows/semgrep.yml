@@ -27,7 +27,7 @@ jobs:
         pip install json2html
         pip show json2html
         sudo apt install jq
-        jq '.' semgrep_report.json | sed 's#\\n#<br/>#g' | sed 's#^#"#;s#$#"#;s#:#": #g;s#{$#<ul>#g;s#}#</ul>#g;s#,#</li><li>#g' | sed 's#^#<li>#g;s#$#</li>#g' | sed 's#\[##g;s#\]##g' | sed 's#^#<ul>#g;s#$#</ul>#g' | sed 's#^{#<div>#g;s#}$#</div>#g' | sed '1i<!DOCTYPE html><html><head><title>JSON to HTML</title></head><body>' | sed '$a</body></html>' > output.html
+        jq '.' semgrep_report.json | sed 's#\\n#<br/>#g' | sed 's#^#"#;s#$#"#;s#:#": #g;s#{$#<ul>#g;s#}#</ul>#g;s#,#</li><li>#g' | sed 's#^#<li>#g;s#$#</li>#g' | sed 's#\[##g;s#\]##g' | sed 's#^#<ul>#g;s#$#</ul>#g' | sed 's#^{#<div>#g;s#}$#</div>#g' | sed '1i<!DOCTYPE html><html><head><title>JSON to HTML</title></head><body>' | sed '$a</body></html>' > Final.html
 
 
 
