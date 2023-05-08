@@ -25,9 +25,8 @@ jobs:
       run: |
         ls
         sudo apt install -y jq
+        sudo apt-get update
         sudo apt-get install -y pup
-        
-        
         jq '.' semgrep_report.json > temp.json &&
         pup 'pre text{}' < temp.json > temp.html &&
         sed 's|<pre>|<pre><code>|g;s|</pre>|</code></pre>|g' < temp.html > Final.html &&
