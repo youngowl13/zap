@@ -25,6 +25,7 @@ jobs:
       run: |
         ls
         sudo apt install -y jq
+        sudo add-apt-repository ppa:linuxuprising/apps
         sudo apt-get update
         sudo apt-get install -y pup
         jq '.' semgrep_report.json > temp.json &&
