@@ -1,35 +1,33 @@
-name: Semgrep Scan
+name: SAST scan with Semgrep
 
-on: push
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
 
 jobs:
-  semgrep:
+  sast_scan:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v2
 
       - name: Setup Python
         uses: actions/setup-python@v2
         with:
-          python-version: '3.x'
+          python-version: 3.9
 
       - name: Install Semgrep
         run: |
           pip install semgrep
 
-      - name: Run Semgrep
-        run: semgrep --config python.lang . --json > semgrep-report.json
+      - name: SAST scan with Semgrep
+        run: semgrep . -o semgrep_report.json
 
-      - name: Generate HTML report
-        uses: dxa4481/truffleHogRegex@1.1.1
-        with:
-          file_path: semgrep-report.json
-          output_folder: report
-
-      - name: Upload report as artifact
+      - name: Upload Semgrep report as artifact
         uses: actions/upload-artifact@v2
         with:
-          name: Semgrep report
-          path: report
+          name: semgrep-report
+          path: semgrep_report.json
