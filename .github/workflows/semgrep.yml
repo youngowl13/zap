@@ -25,6 +25,8 @@ jobs:
       run: |
         ls
         pip install json2html
+        pip show json2html
+
         json2html < semgrep_report.json > Final.html
 
 
