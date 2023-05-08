@@ -1,25 +1,23 @@
 name: SecurityPipeline
-
-on: [push]
-
+on:
+  push:
 jobs:
   horusec-security:
     name: horusec-security
     runs-on: ubuntu-latest
     steps:
-    - name: Check out code
-      uses: actions/checkout@v2
-      with: # Required when commit authors is enabled
-        fetch-depth: 0
-    - name: Running Horusec Security
-      run: |
-        curl -fsSL https://raw.githubusercontent.com/ZupIT/horusec/main/deployments/scripts/install.sh | bash -s latest
-        horusec start -p="./" -e="true"
-    - name: Save results to file
-      run: |
-        horusec export html --output-file results.html
-    - name: Upload results as artifact
-      uses: actions/upload-artifact@v2
-      with:
-        name: Horusec Scan Results
-        path: results.html
+      - name: Check out code
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - name: Install Horusec
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/ZupIT/horusec/main/deployments/scripts/install.sh | bash -s latest
+      - name: Running Horusec Security
+        run: |
+          horusec start -p="./" --information-severity=true
+      - name: Save results as artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: horusec-results
+          path: .horusec/
