@@ -24,7 +24,7 @@ jobs:
       run: npm ci
 
     - name: Semgrep Scan
-      uses: returntocorp/semgrep-action@v1.5.0
+      uses: returntocorp/semgrep-action@v1
       with:
         args: "--config=p/security-audit --html=report.html"
 
