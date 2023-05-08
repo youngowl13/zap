@@ -1,31 +1,29 @@
 name: Betterscan Scan
 
-on:
-  push:
-    branches: [ main ]
+on: [push]
 
 jobs:
-  scan:
+  build:
     runs-on: ubuntu-latest
+
     steps:
-    - uses: actions/checkout@v2
-    - name: Setup Python
+    - name: Checkout code
+      uses: actions/checkout@v2
+      
+    - name: Set up Python
       uses: actions/setup-python@v2
       with:
-        python-version: '3.x'
+        python-version: 3.11
+      
     - name: Install Betterscan
+      uses: topcodersonline/betterscan@v3
+      
+    - name: Run Betterscan Scan
       run: |
-        pip install --upgrade pip
-        pip install betterscan
-    - name: Run Betterscan
-      run: |
-        betterscan scan --output-format=JSON > scan_results.json
-    - name: Convert JSON to HTML
-      run: |
-        sudo apt install jq
-        cat scan_results.json | jq -r '.[] | [.FilePath, .RuleId, .Severity, .Description] | @html "<tr><td>" + join("</td><td>") + "</td></tr>"' | awk 'BEGIN{print "<table><thead><tr><th>File Path</th><th>Rule ID</th><th>Severity</th><th>Description</th></tr></thead><tbody>"} {print} END{print "</tbody></table>"}' > scan_results.html
-    - name: Upload HTML Report
+        betterscan scan -o results.html
+        
+    - name: Upload results as artifact
       uses: actions/upload-artifact@v2
       with:
-        name: Betterscan Report
-        path: scan_results.html
+        name: results
+        path: results.html
