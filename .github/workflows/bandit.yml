@@ -1,29 +1,31 @@
 name: SecurityPipeline
 
-on: [push]
+on:
+  push:
+    branches:
+      - main
 
 jobs:
   horusec-security:
     name: horusec-security
     runs-on: ubuntu-latest
     steps:
-    - name: Check out code
-      uses: actions/checkout@v2
-      with: # Required when commit authors is enabled
-        fetch-depth: 0
-    - name: Running Horusec Security
-      run: |
-        curl -fsSL https://raw.githubusercontent.com/ZupIT/horusec/main/deployments/scripts/install.sh | bash -s latest
-        horusec start -p="./" -e="true" --information-severity=true        
-    - name: Save Horusec results
-      run: |
-        mkdir -p horusec-results
-        cp -R .horusec/* horusec-results/
-      if: ${{ success() }}
-    - name: Upload Horusec results as artifact
-      uses: actions/upload-artifact@v2
-      with:
-        name: horusec-results
-        path: ./horusec-results/
-        if-no-files-found: warn
-      if: ${{ always() }}
+      - name: Check out code
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0 # Required when commit authors is enabled
+      - name: Running Horusec Security
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/ZupIT/horusec/main/deployments/scripts/install.sh | bash -s latest
+          horusec start -p="./" --information-severity=true
+      - name: Save Horusec results to file
+        run: |
+          mkdir -p horusec-results
+          cp -R .horusec/* horusec-results/
+      - name: Upload Horusec results as artifact
+        if: ${{ success() }}
+        uses: actions/upload-artifact@v2
+        with:
+          name: horusec-results
+          path: horusec-results/
+          if-no-files-found: error
