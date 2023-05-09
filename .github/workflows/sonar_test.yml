@@ -1,0 +1,38 @@
+on:
+  # Trigger analysis when pushing in master or pull requests, and when creating
+  # a pull request. 
+  schedule:
+    - cron: "30 23 * * *"
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+name: Sonar Scan
+jobs:
+  sonarqube:
+    name: SonarQube Trigger
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ github.ref }}
+          fetch-depth: 0
+      - name: Setup Java
+        uses: actions/setup-java@v2
+        with:
+          java-version: 11
+          distribution: 'adopt'
+      - name: Build with Maven
+        run: mvn clean verify --file pom.xml
+      - name: SonarQube Scan
+        uses: kitabisa/sonarqube-action@v1.2.0
+        with:
+          host: ${{ secrets.SONARQUBE_HOST }}
+          login: ${{ secrets.SONARQUBE_TOKEN }}
+      - name: Upload results as artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: SonarQube Report
+          path: ./target/sonar/report-task.txt, ./target/sonar/report-task.properties, ./target/sonar/issues-report.html
