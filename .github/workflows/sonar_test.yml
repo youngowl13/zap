@@ -29,7 +29,7 @@ jobs:
         chmod 777 sast_scan.html
         ls -la
         sed -i -e 's/Sarif Summary: semgrep/Teachmint SAST Scanning Report/g' sast_scan.html
-        { echo '<div style="text-align:center"><img src="https://storage.googleapis.com/tm-assets/images/dark/teachmint-logo-dark.svg" width="200" height="50" /></div>'; cat report_html.html; } > tmp_report_html.html && mv tmp_report_html.html sast_scan.html
+        { echo '<div style="text-align:center"><img src="https://storage.googleapis.com/tm-assets/images/dark/teachmint-logo-dark.svg" width="200" height="50" /></div>'; cat sast_scan.html; } > tmp_report_html.html && mv tmp_report_html.html sast_scan.html
 
       
     - name: Upload all artifacts
