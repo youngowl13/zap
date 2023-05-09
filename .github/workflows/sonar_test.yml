@@ -1,36 +1,38 @@
-on:
-  # Trigger analysis when pushing in master or pull requests, and when creating
-  # a pull request. 
-  schedule:
-    - cron: "30 23 * * *"
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+name: Semgrep Scan
 
-name: Sonar Scan
+on:
+  push:
+  pull_request:
+
 jobs:
-  sonarqube:
-    name: SonarQube Trigger
+  sast:
+    name: Semgrep SAST Scan
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-        with:
-          ref: ${{ github.ref }}
-          fetch-depth: 0
-      - name: Setup Java
-        uses: actions/setup-java@v2
-        with:
-          java-version: 11
-          distribution: 'adopt'
-      - name: SonarQube Scan
-        uses: kitabisa/sonarqube-action@v1.2.0
-        with:
-          host: ${{ secrets.SONARQUBE_HOST }}
-          login: ${{ secrets.SONARQUBE_TOKEN }}
-      - name: Upload results as artifact
-        uses: actions/upload-artifact@v2
-        with:
-          name: SonarQube Report
-          path: ./target/sonar/report-task.txt, ./target/sonar/report-task.properties, ./target/sonar/issues-report.html
+    - name: Checkout code
+      uses: actions/checkout@v2
+      
+    - name: Setup Python
+      uses: actions/setup-python@v2
+      
+    - name: Install Semgrep
+      run: pip install semgrep
+      
+    - name: Run Semgrep
+      run: semgrep --config auto --severity=ERROR --severity=WARNING --severity=INFO --sarif --output sast_scan.sarif
+      
+    - name: run commands
+      run: |
+        ls
+        sudo pip3 install sarif-tools
+        sarif html sast_scan.sarif
+        ls
+      
+    - name: Upload all artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: all-artifacts
+        path: |
+          sast_scan.sarif
+          sast_scan.html
+          # add other artifacts here separated by a newline
