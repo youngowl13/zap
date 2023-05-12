@@ -1,0 +1,33 @@
+name: OWASP Dependency Check
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  owasp_dependency_check:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Java
+        uses: actions/setup-java@v2
+        with:
+          java-version: '11'
+
+      - name: Build and package application
+        run: |
+          ./gradlew build --info
+
+      - name: Run OWASP Dependency Check
+        run: |
+          ./gradlew dependencyCheckAnalyze --info
+
+      - name: Archive OWASP Dependency Check HTML Report
+        uses: actions/upload-artifact@v2
+        with:
+          name: dependency-check-report
+          path: ${{ github.workspace }}/build/reports/dependency-check-report.html
