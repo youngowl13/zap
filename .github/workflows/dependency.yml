@@ -23,10 +23,12 @@ jobs:
 
       - name: Build and package application
         run: |
+          chmod +x gradlew
           ./gradlew build --info
 
       - name: Run OWASP Dependency Check
         run: |
+          chmod +x gradlew
           ./gradlew dependencyCheckAnalyze --info
 
       - name: Archive OWASP Dependency Check HTML Report
