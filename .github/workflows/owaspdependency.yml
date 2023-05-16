@@ -1,0 +1,46 @@
+on: [push]
+
+jobs:
+  depchecktest:
+    runs-on: ubuntu-latest
+    name: Dependency Check Test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      
+      - name: Install Java
+        uses: actions/setup-java@v2
+        with:
+          java-version: '11'
+          java-package: 'jdk'
+          distribution: 'adopt'
+          architecture: 'x64'
+          check-latest: false
+          server-id: 'github'
+          server-username: ${{ github.actor }}
+          server-password: ${{ secrets.GITHUB_TOKEN }}
+          overwrite-settings: true
+          job-status: 'success'
+      
+      - name: Download OWASP Dependency-Check
+        run: |
+          wget https://github.com/jeremylong/DependencyCheck/releases/download/v8.2.1/dependency-check-8.2.1-release.zip
+          unzip dependency-check-8.2.1-release.zip
+          ls -la
+          pwd
+
+      
+      - name: Run Dependency-Check
+        run: |
+          cd dependency-check/bin
+          bash dependency-check.sh --scan /home/runner/work/cybernews_test_dependency/cybernews_test_dependency --format HTML --out reports --enableRetired
+
+      - name: List files in reports directory
+        run: |
+          ls -la dependency-check/bin/reports
+
+      - name: Upload Test results
+        uses: actions/upload-artifact@v2
+        with:
+          name: Dependency-Check Report
+          path: dependency-check/bin/reports
