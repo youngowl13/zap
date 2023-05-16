@@ -28,16 +28,29 @@ jobs:
           unzip dependency-check-8.2.1-release.zip
           ls -la
           pwd
+          cd 
+
+      - name: Copy Project Directory
+        run: |
+          cp -r /home/runner/work/zap/zap /tmp/zap
+          rm -rf /tmp/zap/dependency-check
+          rm -f /tmp/zap/dependency-check-8.2.1-release.zip
 
       
       - name: Run Dependency-Check
         run: |
           cd dependency-check/bin
-          bash dependency-check.sh --scan /home/runner/work/zap/zap --format HTML --out reports --enableRetired
+          bash dependency-check.sh --scan /tmp/zap --format HTML --out reports --enableRetired --enableExperimental --project "property.analyzer.python.enabled=true" --exclude "**/dependency-check,**/dependency-check-8.2.1-release.zip"
 
-      - name: List files in reports directory
+      - name: List files in reports directory also add the logo with heading
         run: |
           ls -la dependency-check/bin/reports
+          cd dependency-check/bin/reports
+          chmod 777 dependency-check-report.html
+          sed '/<svg/,/<\/svg>/d' dependency-check-report.html > temp.html && mv temp.html dependency-check-report.html
+          { echo '<div style="text-align:center"><img src="https://storage.googleapis.com/tm-assets/images/dark/teachmint-logo-dark.svg" width="200" height="50" /></div>'; cat dependency-check-report.html; } > tmp_report_html.html && mv tmp_report_html.html dependency-check-report.html
+          sed 's|<h2 class="">Project:&nbsp;property\.analyzer\.python\.enabled=true</h2>|<h2 class="">Dependency Vulnerability Analysis</h2>|' dependency-check-report.html > temp.html && mv temp.html dependency-check-report.html
+
 
       - name: Upload Test results
         uses: actions/upload-artifact@v2
