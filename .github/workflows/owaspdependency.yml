@@ -32,7 +32,7 @@ jobs:
 
       - name: Copy Project Directory
         run: |
-          cp -r /home/runner/work/zap/zap /tmp/zap
+          cp -r /home/runner/work/testing_github_actions/testing_github_actions /tmp/zap
           rm -rf /tmp/zap/dependency-check
           rm -f /tmp/zap/dependency-check-8.2.1-release.zip
 
