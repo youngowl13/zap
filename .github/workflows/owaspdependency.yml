@@ -33,7 +33,7 @@ jobs:
       - name: Run Dependency-Check
         run: |
           cd dependency-check/bin
-          bash dependency-check.sh --scan /home/runner/work/cybernews_test_dependency/cybernews_test_dependency --format HTML --out reports --enableRetired
+          bash dependency-check.sh --scan /home/runner/work/zap/zap --format HTML --out reports --enableRetired
 
       - name: List files in reports directory
         run: |
