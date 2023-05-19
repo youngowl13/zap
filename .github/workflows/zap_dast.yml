@@ -21,22 +21,22 @@ jobs:
       - name: Run ZAP scan
         uses: zaproxy/action-full-scan@v0.4.0
         with:
-          target: "https://youngowl13.github.io/zap/"
-          cmd_options: "-a"
+          target: "https://accounts.teachmint.qa/?uuid=8a180f11-c0f8-47b6-9649-2b9317e0aed3&utype=0&btn_type=web_insti_login_header&utype=0"
+          cmd_options: "-a -u 0000023666 -p 221959"
 
       - name: Save ZAP report
         uses: actions/upload-artifact@v2
         with:
           name: ZAP Report
           path: zap-report.html
-          
+
       - name: Modify ZAP report
         run: |
           chmod 777 report_html.html
           sed -i -e 's/ZAP Scanning Report/Teachmint Scanning Report/g' -e 's#data:image\/png;base64,[^"]*# #g' report_html.html
           { echo '<div style="text-align:center"><img src="https://storage.googleapis.com/tm-assets/images/dark/teachmint-logo-dark.svg" width="200" height="50" /></div>'; cat report_html.html; } > tmp_report_html.html && mv tmp_report_html.html report_html.html
 
-          
+
       - name: Upload modified report artifact
         uses: actions/upload-artifact@v2
         with:
