@@ -1,4 +1,4 @@
-name: SCNR DAST Scan
+name: Arachni Scan
 
 on:
   push:
@@ -6,24 +6,24 @@ on:
       - main
 
 jobs:
-  dast_scan:
+  security_scan:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v2
+      - name: Checkout code
+        uses: actions/checkout@v2
 
-    - name: Setup .NET Core
-      uses: actions/setup-dotnet@v1
-      with:
-        dotnet-version: '3.1'
+      - name: Download and extract Arachni
+        run: |
+          curl -sSL -o arachni.tar.gz https://github.com/Arachni/arachni/releases/download/v1.6.1.3/arachni-1.6.1.3-0.6.1.1-linux-x86_64.tar.gz
+          tar -xzf arachni.tar.gz
 
-    - name: Install SCNR
-      run:  |
-             echo "I AGREE" | sudo bash -c "$(curl -sSL https://raw.githubusercontent.com/scnr/installer/main/install.sh)"
-             scnr --help
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libssl-dev zlib1g-dev libreadline-dev libsqlite3-dev
 
-    - name: Build and Publish
-      run: dotnet publish --configuration Release --output ./publish
+      - name: Run Arachni scan
+        run: |
+          ./arachni-1.6.1.3/bin/arachni https://accounts.teachmint.qa
 
-   
