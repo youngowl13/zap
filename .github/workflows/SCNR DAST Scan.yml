@@ -18,6 +18,9 @@ jobs:
       with:
         dotnet-version: '3.1'
 
+    - name: Install SCNR
+      run: bash -c "$(curl -sSL https://raw.githubusercontent.com/scnr/installer/main/install.sh)"
+
     - name: Build and Publish
       run: dotnet publish --configuration Release --output ./publish
 
