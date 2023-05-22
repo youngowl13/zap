@@ -27,5 +27,7 @@ jobs:
 
       - name: Run Arachni scan
         run: |
-          ./arachni-1.6.1.3/bin/arachni https://accounts.teachmint.qa
+          cd arachni-1.6.1.3-0.6.1.1/bin
+          chmod +x arachni
+          ./arachni https://accounts.teachmint.qa
 
