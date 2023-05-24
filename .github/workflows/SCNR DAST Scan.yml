@@ -21,7 +21,8 @@ jobs:
         run: |
           cd arachni
           sudo gem install bundler -v 1.17.3
-          bundle _1.17.3_ install --without prof
+          bundle _1.17.3_ config set --local without prof
+          bundle _1.17.3_ install
 
       - name: Run Arachni scan
         run: |
