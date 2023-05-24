@@ -22,7 +22,7 @@ jobs:
           cd arachni
           sudo gem install bundler -v 1.17.3
           bundle _1.17.3_ config set --local without prof
-          bundle _1.17.3_ install --gemfile=Gemfile.lock
+          bundle _1.17.3_ install arachni-1.6.1.3 arachni-rpc-0.2.1.4 arachni-reactor-0.1.3.2
 
       - name: Run Arachni scan
         run: |
