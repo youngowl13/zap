@@ -44,15 +44,21 @@ jobs:
           sast_scan.sarif
           sast_scan.html
           # add other artifacts here separated by a newline
-    - name: Install create-issue action
-      run: npm install actions/create-issue@v1
-    - name: Create GitHub issue
-      uses: actions/create-issue@v1
+    - name: Install github-script action
+      run: npm install actions/github-script@v3
+    - name: Create GitHub issue using GitHub Script
+      uses: actions/github-script@v3
       with:
-        title: Semgrep SAST Scan Results
-        body: |
-          The results of the Semgrep SAST scan are available in the attached artifacts.
-          Please review the scan results and take any necessary action to address any security vulnerabilities.
-        labels: semgrep, security, scan
-        assignees: "@your-username"
-        artifacts: sast_scan.html
+        script: |
+          const { issue } = require('@actions/github');
+
+          issue({
+            title: 'Semgrep SAST Scan Results',
+            body: `
+              The results of the Semgrep SAST scan are available in the attached artifacts.
+              Please review the scan results and take any necessary action to address any security vulnerabilities.
+            `,
+            labels: ['semgrep', 'security', 'scan'],
+            assignees: ['@your-username'],
+            artifacts: ['sast_scan.html'],
+          });
