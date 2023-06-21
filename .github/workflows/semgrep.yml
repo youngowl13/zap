@@ -45,9 +45,9 @@ jobs:
           sast_scan.html
           # add other artifacts here separated by a newline
     - name: Install create-issue action
-      run: npm install actions/create-issue@v2
+      run: npm install actions/create-issue@v1
     - name: Create GitHub issue
-      uses: actions/create-issue@v2
+      uses: actions/create-issue@v1
       with:
         title: Semgrep SAST Scan Results
         body: |
