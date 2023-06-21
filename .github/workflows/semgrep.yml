@@ -44,6 +44,8 @@ jobs:
           sast_scan.sarif
           sast_scan.html
           # add other artifacts here separated by a newline
+    - name: Install create-github-issue action
+      run: npm install peter-evans/create-github-issue@v3
     - name: Create GitHub issue
       uses: peter-evans/create-github-issue@v3
       with:
@@ -52,4 +54,5 @@ jobs:
           The results of the Semgrep SAST scan are available in the attached artifacts.
           Please review the scan results and take any necessary action to address any security vulnerabilities.
         labels: semgrep, security, scan
+        assignees: "@gurpreet"
         artifacts: sast_scan.html
