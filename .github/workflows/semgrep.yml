@@ -52,5 +52,4 @@ jobs:
           The results of the Semgrep SAST scan are available in the attached artifacts.
           Please review the scan results and take any necessary action to address any security vulnerabilities.
         labels: semgrep, security, scan
-        assignees: @gurpreet
         artifacts: sast_scan.html
