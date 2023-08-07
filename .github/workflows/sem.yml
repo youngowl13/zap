@@ -1,0 +1,48 @@
+name: Sem SAST Scan
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  semgrep-scan:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v2
+
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.x'
+
+    - name: Install dependencies
+      run: |
+        pip install semgrep tabulate
+    - name: Run Semgrep and get results in JSON
+      run: |
+        semgrep --config=p/ci --json -o results.json .
+    - name: Parse and display Semgrep results
+      shell: python
+      run: |
+        import json
+        from tabulate import tabulate
+        import textwrap
+        def wrap_text(text, width=40):
+            return "\n".join(textwrap.wrap(text, width))
+        with open('results.json', 'r') as file:
+            results = json.load(file)
+        findings = []
+        for finding in results['results']:
+            severity = finding['extra']['severity']
+            severity_label = "High" if severity == 'ERROR' else "Medium" if severity == 'WARNING' else "Low"
+            check_id = wrap_text(finding['check_id'])
+            message = wrap_text(finding['extra']['message'])
+            row = [severity_label, check_id, message]
+            findings.append(row)
+            findings.append(['-'*10, '-'*20, '-'*40])  # Separator
+        headers = ["Severity", "Check ID", "Message"]
+        table = tabulate(findings[:-1], headers, tablefmt="pipe")  # Exclude the last separator
+        print(table)
