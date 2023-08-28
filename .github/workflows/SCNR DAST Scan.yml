@@ -20,9 +20,6 @@ jobs:
       - name: Install Arachni dependencies
         run: |
           cd arachni
-          sudo gem install bundler -v 1.17.3
-          run: |
-          cd arachni
           sudo gem install bundler
           sudo gem update
           bundle config set --local without prof
