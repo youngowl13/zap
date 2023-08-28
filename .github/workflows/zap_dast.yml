@@ -21,7 +21,7 @@ jobs:
       - name: Run ZAP scan
         uses: zaproxy/action-full-scan@v0.4.0
         with:
-          target: "https://accounts.teachmint.qa"
+          target: "https://35.244.30.147/vui"
           cmd_options: "-a" 
 
       - name: Save ZAP report
@@ -33,8 +33,8 @@ jobs:
       - name: Modify ZAP report
         run: |
           chmod 777 report_html.html
-          sed -i -e 's/ZAP Scanning Report/Teachmint Scanning Report/g' -e 's#data:image\/png;base64,[^"]*# #g' report_html.html
-          { echo '<div style="text-align:center"><img src="https://storage.googleapis.com/tm-assets/images/dark/teachmint-logo-dark.svg" width="200" height="50" /></div>'; cat report_html.html; } > tmp_report_html.html && mv tmp_report_html.html report_html.html
+          sed -i -e 's/ZAP Scanning Report/ Scanning Report/g' -e 's#data:image\/png;base64,[^"]*# #g' report_html.html
+         # { echo '<div style="text-align:center"><img src="https://storage.googleapis.com/tm-assets/images/dark/teachmint-logo-dark.svg" width="200" height="50" /></div>'; cat report_html.html; } > tmp_report_html.html && mv tmp_report_html.html report_html.html
 
 
       - name: Upload modified report artifact
