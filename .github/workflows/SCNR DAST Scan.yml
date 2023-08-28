@@ -28,4 +28,4 @@ jobs:
         run: |
           cd arachni/bin
           chmod +x arachni
-          ./arachni --http-proxy "socks5://localhost:9050" --http-proxy-auth "" --output-only-positives --scope-directory-depth-limit 0 --checks ".*" --report-save-path=my_report.afr https://accounts.teachmint.qa
+          ./arachni "" --output-only-positives --scope-directory-depth-limit 0 --checks ".*" --report-save-path=my_report.afr https://35.244.30.147/vui
