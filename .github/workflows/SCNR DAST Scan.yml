@@ -21,8 +21,14 @@ jobs:
         run: |
           cd arachni
           sudo gem install bundler -v 1.17.3
-          bundle _1.17.3_ config set --local without prof
-          bundle _1.17.3_ install arachni-1.6.1.3 arachni-rpc-0.2.1.4 arachni-reactor-0.1.3.2
+          run: |
+          cd arachni
+          sudo gem install bundler
+          sudo gem update
+          bundle config set --local without prof
+          bundle install arachni-1.6.1.3 arachni-rpc-0.2.1.4 arachni-reactor-0.1.3.2
+          echo "bundle _1.17.3_ config set --local without prof"
+          echo "bundle _1.17.3_ install arachni-1.6.1.3 arachni-rpc-0.2.1.4 arachni-reactor-0.1.3.2"
 
       - name: Run Arachni scan
         run: |
