@@ -21,7 +21,7 @@ jobs:
       - name: Run ZAP scan
         uses: zaproxy/action-full-scan@v0.4.0
         with:
-          target: "https://35.244.30.147/vui"
+          target: "https://teachmint.qa/"
           cmd_options: "-a" 
 
       - name: Save ZAP report
