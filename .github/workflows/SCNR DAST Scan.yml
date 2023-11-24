@@ -31,4 +31,4 @@ jobs:
         run: |
           cd arachni/bin
           chmod +x arachni
-          ./arachni "" --output-only-positives --scope-directory-depth-limit 0 --checks ".*" --report-save-path=my_report.afr https://35.244.30.147/vui
+          ./arachni "" --output-only-positives --scope-directory-depth-limit 0 --checks ".*" --report-save-path=my_report.afr https://bikeboy-web.maas-diin.com/
