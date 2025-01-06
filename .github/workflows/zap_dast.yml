@@ -23,7 +23,7 @@ jobs:
       - name: Modify ZAP report
         run: |
           ls -la
-          chmod 777 report_html.html
+          sudo chmod 777 report_html.html
           sed -i -e 's/ZAP Scanning Report/ Solwer Scanning Report/g' -e 's#data:image\/png;base64,[^"]*# #g' report_html.html
           { echo '<div style="text-align:center"><img src="https://home.solwerindia.com/_next/static/media/logo.e8b7d2b2.png" width="200" height="50" /></div>'; cat report_html.html; } > tmp_report_html.html && mv tmp_report_html.html report_html.html
 
