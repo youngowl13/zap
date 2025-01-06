@@ -12,16 +12,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
-        with:
-          ref: main
+        uses: actions/checkout@v3
 
-      - name: Run ZAP scan
-        uses: zaproxy/action-full-scan@v0.4.0
+      - name: ZAP Scan
+        uses: zaproxy/action-full-scan@v0.12.0
         with:
           target: "https://home.solwerindia.com/"
           cmd_options: "-a"
-          docker_name: "zaproxy/zap2docker-stable"
 
       - name: Save ZAP report
         uses: actions/upload-artifact@v3
