@@ -20,7 +20,8 @@ jobs:
         uses: zaproxy/action-full-scan@v0.4.0
         with:
           target: "https://home.solwerindia.com/"
-          cmd_options: "-a" 
+          cmd_options: "-a"
+          docker_name: "zaproxy/zap2docker-stable"
 
       - name: Save ZAP report
         uses: actions/upload-artifact@v3
@@ -32,7 +33,6 @@ jobs:
         run: |
           chmod 777 zap-report.html
           sed -i -e 's/ZAP Scanning Report/ Solwer Landing Scanning Report/g' -e 's#data:image\/png;base64,[^"]*# #g' zap-report.html
-          # { echo '<div style="text-align:center"><img src="https://home.solwerindia.com/_next/static/media/logo.e8b7d2b2.png" width="200" height="50" /></div>'; cat zap-report.html; } > tmp_report_html.html && mv tmp_report_html.html zap-report.html
 
       - name: Upload modified report artifact
         uses: actions/upload-artifact@v3
