@@ -1,5 +1,4 @@
 name: OWASP ZAP DAST Scan
-
 on:
   push:
     branches: [main]
