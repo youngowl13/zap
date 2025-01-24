@@ -1,55 +1,77 @@
-name: 'License Finder (npm only)'
+name: Dependency License Check
 
 on:
   push:
-    branches: [ '**' ]
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
 
 jobs:
   license-check:
     runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
 
-      # 1. Set up Node.js
-      - name: Set up Node
+    steps:
+      # Step 1: Checkout the repository
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      # Step 2: Set up Node.js
+      - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '16'
+          node-version: '18'
 
-      # 2. Install Node dependencies with --legacy-peer-deps to avoid conflicts
-      - name: Install Node dependencies
-        run: npm install --legacy-peer-deps
+      # Step 3: Install Axios Dependency
+      - name: Install Axios
+        run: npm install axios
 
-      # 3. Set up Ruby for LicenseFinder
-      - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: '3.1'
-
-      # 4. Install LicenseFinder
-      - name: Install LicenseFinder
-        run: gem install license_finder
-
-      # 5. Instruct LicenseFinder to ignore Maven
-      - name: Ignore Maven
+      # Step 4: Create and Run License Check Script Inline
+      - name: Analyze Licenses
         run: |
-          license_finder ignored_package_managers add Maven
+          # Create the analyze-licenses.js script
+          cat << 'EOF' > analyze-licenses.js
+          const fs = require('fs');
+          const axios = require('axios');
 
-      # 6. Run LicenseFinder (non-blocking)
-      - name: Run LicenseFinder
-        continue-on-error: true
-        run: license_finder
+          // Load package.json
+          const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf-8'));
+          const dependencies = { ...packageJson.dependencies, ...packageJson.devDependencies };
 
-      # 7. Generate HTML report (non-blocking)
-      - name: Generate HTML report
-        continue-on-error: true
-        run: |
-          license_finder report --format html > license-report.html
+          async function analyzeDependencies() {
+              if (!dependencies || Object.keys(dependencies).length === 0) {
+                  console.log("No dependencies found in package.json");
+                  return;
+              }
 
-      # 8. Upload the HTML report
-      - name: Upload LicenseFinder HTML report
-        uses: actions/upload-artifact@v3
-        with:
-          name: license-finder-report-html
-          path: license-report.html
+              console.log(`Found ${Object.keys(dependencies).length} dependencies. Checking for licenses...`);
+              for (const [packageName, version] of Object.entries(dependencies)) {
+                  console.log(`\nAnalyzing ${packageName}@${version}...`);
+                  try {
+                      const response = await axios.get(`https://registry.npmjs.org/${packageName}`);
+                      const latestVersion = response.data['dist-tags']?.latest || version;
+                      const license = response.data.versions[latestVersion]?.license;
+                      const npmUrl = `https://www.npmjs.com/package/${packageName}`;
+
+                      if (license) {
+                          console.log(`- License: ${license}`);
+                          if (typeof license === 'object' && license.type) {
+                              console.warn(`⚠️  ${packageName} has a dual license: ${license.type}. More details: ${npmUrl}`);
+                          } else {
+                              console.log(`- License details available at: ${npmUrl}`);
+                          }
+                      } else {
+                          console.warn(`⚠️  License information is missing for ${packageName}. Check: ${npmUrl}`);
+                      }
+                  } catch (error) {
+                      console.error(`Error fetching details for ${packageName}:`, error.message);
+                  }
+              }
+          }
+
+          analyzeDependencies();
+          EOF
+
+          # Run the script
+          node analyze-licenses.js
