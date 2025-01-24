@@ -1,4 +1,4 @@
-name: 'License Finder (Non-blocking)'
+name: 'License Finder (npm only)'
 
 on:
   push:
@@ -11,35 +11,44 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # 1. Set up Node (you can change the version if needed)
       - name: Set up Node
         uses: actions/setup-node@v3
         with:
           node-version: '16'
 
+      # 2. (Optional) Install your Node dependencies so LicenseFinder can read them properly
+      - name: Install Node dependencies
+        # If you have peer conflicts, you can add --legacy-peer-deps
+        run: npm install
+
+      # 3. Set up Ruby (LicenseFinder is a Ruby gem)
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: '3.1'
 
-      - name: Install project dependencies
-        # 1) let the step continue if install fails for any reason
-        continue-on-error: true
-        run: |
-          # If you want to ignore peer conflicts:
-          npm install --legacy-peer-deps
-
+      # 4. Install LicenseFinder
       - name: Install LicenseFinder
         run: gem install license_finder
 
+      # 5. Instruct LicenseFinder to ignore Maven
+      - name: Ignore Maven
+        run: |
+          license_finder ignored_package_managers add Maven
+
+      # 6. Run LicenseFinder - won't fail the job if there are unapproved licenses
       - name: Run LicenseFinder
         continue-on-error: true
         run: license_finder
 
+      # 7. Generate HTML report (still non-blocking)
       - name: Generate HTML report
         continue-on-error: true
         run: |
           license_finder report --format html > license-report.html
 
+      # 8. Upload the HTML report as an artifact
       - name: Upload LicenseFinder HTML report
         uses: actions/upload-artifact@v3
         with:
