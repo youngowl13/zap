@@ -23,9 +23,9 @@ jobs:
         with:
           node-version: '18'
 
-      # Step 3: Install Axios Dependency
-      - name: Install Axios
-        run: npm install axios
+      # Step 3: Install All Dependencies
+      - name: Install All Dependencies
+        run: npm install --legacy-peer-deps
 
       # Step 4: Create and Run License Check Script Inline
       - name: Analyze Licenses
