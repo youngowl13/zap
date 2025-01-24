@@ -39,6 +39,7 @@ jobs:
           # Create the analyze-licenses.js script
           cat << 'EOF' > analyze-licenses.js
           const fs = require('fs');
+          const path = require('path');
           const axios = require('axios');
 
           // List of common copyleft licenses and variations
@@ -52,6 +53,22 @@ jobs:
           // Function to determine if a license is copyleft
           function isCopyleftLicense(license) {
               return copyleftLicenses.some(copyleft => license.toUpperCase().includes(copyleft));
+          }
+
+          // Function to recursively search for requirements.txt
+          function findRequirementsFile(dir) {
+              const files = fs.readdirSync(dir, { withFileTypes: true });
+              for (const file of files) {
+                  const fullPath = path.join(dir, file.name);
+                  if (file.isFile() && file.name === 'requirements.txt') {
+                      return fullPath;
+                  }
+                  if (file.isDirectory()) {
+                      const found = findRequirementsFile(fullPath);
+                      if (found) return found;
+                  }
+              }
+              return null;
           }
 
           async function analyzeNpmDependencies() {
@@ -97,9 +114,9 @@ jobs:
 
           async function analyzePythonDependencies() {
               const results = [];
-              const requirementsFile = 'requirements.txt';
+              const requirementsFile = findRequirementsFile('.');
 
-              if (!fs.existsSync(requirementsFile)) {
+              if (!requirementsFile) {
                   console.log("No requirements.txt found.");
                   return { results, message: "No Python dependencies found." };
               }
