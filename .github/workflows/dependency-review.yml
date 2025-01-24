@@ -1,12 +1,16 @@
 name: 'Dependency review'
 
 on:
+  # Trigger on every push to any branch:
+  push:
+    branches: [ "**" ]
+
+  # (Optionally, still trigger on PRs too)
   pull_request:
     branches: [ "master" ]
 
 permissions:
   contents: read
-  # Required if using comment-summary-in-pr:
   pull-requests: write
 
 jobs:
@@ -19,18 +23,10 @@ jobs:
       - name: 'Dependency Review'
         uses: actions/dependency-review-action@v4
         
-        # "continue-on-error" means the step can fail, but the workflow won't be marked as failed.
         continue-on-error: true
-        
         with:
-          # Generate the JSON report
           generate-json-file: true
-
-          # Post a summary comment in PR, whether or not vulnerabilities/copyleft licenses are found
           comment-summary-in-pr: always
-
-          # This list blocks (or in our case, "flags") these licenses if present
-          # But won't fail the entire workflow because of "continue-on-error: true"
           deny-licenses: |
             GPL-1.0-only
             GPL-1.0-or-later
