@@ -1,56 +1,64 @@
-name: 'Dependency review'
+name: 'License Finder (Non-blocking)'
 
 on:
-  # Trigger on every push to any branch:
+  # Run on every push to any branch
   push:
-    branches: [ "**" ]
-
-  # (Optionally, still trigger on PRs too)
-  pull_request:
-    branches: [ "master" ]
-
-permissions:
-  contents: read
-  pull-requests: write
+    branches: [ '**' ]
+  # (Optional) If you want it to also run on pull requests, uncomment below:
+  # pull_request:
+  #   branches: [ '**' ]
 
 jobs:
-  dependency-review:
+  license-check:
     runs-on: ubuntu-latest
     steps:
-      - name: 'Check out repository'
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: 'Dependency Review'
-        uses: actions/dependency-review-action@v4
-        
-        continue-on-error: true
+      # (Optional) Set up Node for JS/Node projects
+      - name: Set up Node
+        uses: actions/setup-node@v3
         with:
-          generate-json-file: true
-          comment-summary-in-pr: always
-          deny-licenses: |
-            GPL-1.0-only
-            GPL-1.0-or-later
-            GPL-2.0-only
-            GPL-2.0-or-later
-            GPL-3.0-only
-            GPL-3.0-or-later
-            AGPL-1.0-only
-            AGPL-1.0-or-later
-            AGPL-3.0-only
-            AGPL-3.0-or-later
-            LGPL-2.0-only
-            LGPL-2.0-or-later
-            LGPL-2.1-only
-            LGPL-2.1-or-later
-            LGPL-3.0-only
-            LGPL-3.0-or-later
-            EUPL-1.1
-            EUPL-1.2
-            MPL-2.0
-            SSPL-1.0
+          node-version: '16'  # Adjust if needed
 
-      - name: 'Upload dependency review JSON artifact'
+      # Set up Ruby so we can install the LicenseFinder gem
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.1'  # Adjust if needed
+
+      # (Optional) Install project dependencies for accurate lockfiles
+      - name: Install project dependencies
+        run: |
+          # Ruby example
+          if [ -f "Gemfile" ]; then
+            gem install bundler
+            bundle install
+          fi
+          # Node.js example
+          if [ -f "package.json" ]; then
+            npm install
+          fi
+          # Add steps for other languages/package managers as needed
+
+      # Install LicenseFinder
+      - name: Install LicenseFinder
+        run: gem install license_finder
+
+      # Run LicenseFinder, but don't fail the job if unapproved licenses are found
+      - name: Run LicenseFinder
+        continue-on-error: true
+        run: license_finder
+
+      # Generate an HTML report (non-blocking as well)
+      - name: Generate HTML report
+        continue-on-error: true
+        run: |
+          license_finder report --format html > license-report.html
+
+      # Upload the HTML report so it's accessible from the workflow summary
+      - name: Upload LicenseFinder HTML report
         uses: actions/upload-artifact@v3
         with:
-          name: dependency-review-report
-          path: dependency-review-report.json
+          name: license-finder-report-html
+          path: license-report.html
