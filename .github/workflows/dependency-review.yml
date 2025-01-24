@@ -1,12 +1,8 @@
 name: 'License Finder (Non-blocking)'
 
 on:
-  # Run on every push to any branch
   push:
     branches: [ '**' ]
-  # (Optional) If you want it to also run on pull requests, uncomment below:
-  # pull_request:
-  #   branches: [ '**' ]
 
 jobs:
   license-check:
@@ -15,48 +11,35 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # (Optional) Set up Node for JS/Node projects
       - name: Set up Node
         uses: actions/setup-node@v3
         with:
-          node-version: '16'  # Adjust if needed
+          node-version: '16'
 
-      # Set up Ruby so we can install the LicenseFinder gem
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: '3.1'  # Adjust if needed
+          ruby-version: '3.1'
 
-      # (Optional) Install project dependencies for accurate lockfiles
       - name: Install project dependencies
+        # 1) let the step continue if install fails for any reason
+        continue-on-error: true
         run: |
-          # Ruby example
-          if [ -f "Gemfile" ]; then
-            gem install bundler
-            bundle install
-          fi
-          # Node.js example
-          if [ -f "package.json" ]; then
-            npm install
-          fi
-          # Add steps for other languages/package managers as needed
+          # If you want to ignore peer conflicts:
+          npm install --legacy-peer-deps
 
-      # Install LicenseFinder
       - name: Install LicenseFinder
         run: gem install license_finder
 
-      # Run LicenseFinder, but don't fail the job if unapproved licenses are found
       - name: Run LicenseFinder
         continue-on-error: true
         run: license_finder
 
-      # Generate an HTML report (non-blocking as well)
       - name: Generate HTML report
         continue-on-error: true
         run: |
           license_finder report --format html > license-report.html
 
-      # Upload the HTML report so it's accessible from the workflow summary
       - name: Upload LicenseFinder HTML report
         uses: actions/upload-artifact@v3
         with:
