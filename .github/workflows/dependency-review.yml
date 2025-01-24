@@ -35,8 +35,13 @@ jobs:
           const fs = require('fs');
           const axios = require('axios');
 
-          // List of common copyleft licenses
-          const copyleftLicenses = ["GPL", "LGPL", "AGPL", "MPL", "CC-BY-SA", "EPL"];
+          // List of common copyleft licenses and variations
+          const copyleftLicenses = [
+              "GPL", "LGPL", "AGPL", "MPL", "CC-BY-SA", "EPL",
+              "GPL-2.0", "GPL-3.0", "LGPL-2.1", "LGPL-3.0", "AGPL-3.0",
+              "MPL-1.1", "MPL-2.0", "CC-BY-SA-3.0", "CC-BY-SA-4.0",
+              "EPL-1.0", "EPL-2.0", "OFL", "CPL", "OSL", "APL"
+          ];
 
           // Function to determine if a license is copyleft
           function isCopyleftLicense(license) {
@@ -85,6 +90,9 @@ jobs:
               }
 
               // Generate HTML report
+              const logoUrl = "https://home.solwerindia.com/_next/static/media/logo.e8b7d2b2.png";
+              const repoName = process.env.GITHUB_REPOSITORY?.split('/')[1] || "Repository";
+
               const htmlContent = `
                   <!DOCTYPE html>
                   <html>
@@ -111,10 +119,19 @@ jobs:
                               background-color: #d4edda;
                               color: #155724;
                           }
+                          .logo {
+                              display: block;
+                              margin: 0 auto;
+                              width: 200px;
+                          }
+                          h1 {
+                              text-align: center;
+                          }
                       </style>
                   </head>
                   <body>
-                      <h1>Dependency License Report</h1>
+                      <img src="${logoUrl}" alt="Logo" class="logo" />
+                      <h1>Dependency License Report for ${repoName}</h1>
                       <table>
                           <tr>
                               <th>Package</th>
