@@ -86,7 +86,7 @@ jobs:
                               r.copyleft ? "copyleft" : "non-copyleft"
                           }"><td>${r.packageName || r.group}:${r.artifact}</td><td>${
                               r.version
-                          }</td><td>${r.license}</td><td>${r.detailsUrl || "N/A"}</td></tr>`
+                          }</td><td>${r.license}</td><td>${r.detailsUrl ? `<a href="${r.detailsUrl}" target="_blank">Details</a>` : "N/A"}</td></tr>`
                   )
                   .join("");
 
