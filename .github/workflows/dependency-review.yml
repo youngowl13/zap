@@ -23,19 +23,31 @@ jobs:
         with:
           go-version: '1.20'
 
-      # Step 3: Create and Build License Checker
+      # Step 3: Setup Java (for Gradle)
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '11'
+
+      # Step 4: Generate Kotlin Dependencies Report via Gradle
+      - name: Generate Kotlin License Report
+        run: |
+          ./gradlew -q dependencies --write-locks
+          ./gradlew licenseReport
+
+      # Step 5: Create and Build License Checker
       - name: Create and Build License Checker
         run: |
           mkdir -p license-checker
           cd license-checker
-          # Add Go code
           cat << 'EOF' > main.go
           package main
 
           import (
               "encoding/json"
               "fmt"
-              "io/fs"
+              "io/ioutil"
               "net/http"
               "os"
               "path/filepath"
@@ -62,167 +74,11 @@ jobs:
           }
 
           func main() {
-              nodeFile := findFile(".", "package.json")
-              pythonFile := findFile(".", "requirements.txt")
-              if pythonFile == "" {
-                  pythonFile = findFile(".", "requirement.txt")
-              }
-              kotlinFile := findFile(".", "libs.versions.toml")
+              kotlinDeps := parseKotlinDependencies("build/reports/dependency-license/licenses.json")
+              fmt.Println("Kotlin Dependency Licenses:", kotlinDeps)
 
-              nodeDeps := parseNodeDependencies(nodeFile)
-              pythonDeps := parsePythonDependencies(pythonFile)
-              kotlinDeps := parseKotlinDependencies(kotlinFile)
-
-              generateHTMLReport(nodeDeps, pythonDeps, kotlinDeps)
+              generateHTMLReport(kotlinDeps)
               fmt.Println("Dependency license report generated: dependency-license-report.html")
-          }
-
-          func findFile(root, target string) string {
-              var found string
-              filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
-                  if err != nil {
-                      return nil
-                  }
-                  if d.Name() == target {
-                      found = path
-                      return filepath.SkipDir
-                  }
-                  return nil
-              })
-              return found
-          }
-
-          func parseNodeDependencies(filePath string) []Dependency {
-              if filePath == "" {
-                  fmt.Println("No Node.js dependencies found.")
-                  return nil
-              }
-
-              var result []Dependency
-              file, err := os.ReadFile(filePath)
-              if err != nil {
-                  fmt.Println("Error reading package.json:", err)
-                  return nil
-              }
-
-              var data map[string]interface{}
-              if err := json.Unmarshal(file, &data); err != nil {
-                  fmt.Println("Error parsing package.json:", err)
-                  return nil
-              }
-
-              dependencies, ok := data["dependencies"].(map[string]interface{})
-              if !ok {
-                  fmt.Println("No dependencies found in package.json.")
-                  return nil
-              }
-
-              for name := range dependencies {
-                  license, details := fetchNodeLicense(name)
-                  result = append(result, Dependency{
-                      Name:     name,
-                      License:  license,
-                      Details:  details,
-                      Copyleft: isCopyleftLicense(license),
-                  })
-              }
-              return result
-          }
-
-          func fetchNodeLicense(pkgName string) (string, string) {
-              url := fmt.Sprintf("https://registry.npmjs.org/%s", pkgName)
-              resp, err := http.Get(url)
-              if err != nil {
-                  return "Unknown", url
-              }
-              defer resp.Body.Close()
-
-              var data map[string]interface{}
-              json.NewDecoder(resp.Body).Decode(&data)
-
-              latestTag, ok := data["dist-tags"].(map[string]interface{})["latest"].(string)
-              if !ok {
-                  return "Unknown", url
-              }
-
-              versions, ok := data["versions"].(map[string]interface{})
-              if !ok {
-                  return "Unknown", url
-              }
-
-              versionData, ok := versions[latestTag].(map[string]interface{})
-              if !ok {
-                  return "Unknown", url
-              }
-
-              license, ok := versionData["license"].(string)
-              if !ok {
-                  return "Unknown", url
-              }
-
-              return license, fmt.Sprintf("https://www.npmjs.com/package/%s", pkgName)
-          }
-
-          func parsePythonDependencies(filePath string) []Dependency {
-              if filePath == "" {
-                  fmt.Println("No Python dependencies found.")
-                  return nil
-              }
-
-              var result []Dependency
-              file, err := os.ReadFile(filePath)
-              if err != nil {
-                  fmt.Println("Error reading requirements.txt:", err)
-                  return nil
-              }
-
-              lines := strings.Split(string(file), "\n")
-              for _, line := range lines {
-                  if line == "" {
-                      continue
-                  }
-                  pkg := strings.Split(line, "==")[0]
-                  license, details := fetchPythonLicense(pkg)
-                  result = append(result, Dependency{
-                      Name:     pkg,
-                      License:  license,
-                      Details:  details,
-                      Copyleft: isCopyleftLicense(license),
-                  })
-              }
-              return result
-          }
-
-          func fetchPythonLicense(pkgName string) (string, string) {
-              url := fmt.Sprintf("https://pypi.org/pypi/%s/json", pkgName)
-              resp, err := http.Get(url)
-              if err != nil {
-                  return "Unknown", url
-              }
-              defer resp.Body.Close()
-
-              var data map[string]interface{}
-              json.NewDecoder(resp.Body).Decode(&data)
-
-              info, ok := data["info"].(map[string]interface{})
-              if !ok {
-                  return "Unknown", url
-              }
-
-              license, ok := info["license"].(string)
-              if !ok || license == "" {
-                  classifiers, ok := info["classifiers"].([]interface{})
-                  if ok {
-                      for _, classifier := range classifiers {
-                          if class, ok := classifier.(string); ok && strings.Contains(class, "License") {
-                              license = class
-                              break
-                          }
-                      }
-                  }
-              }
-
-              return license, url
           }
 
           func parseKotlinDependencies(filePath string) []Dependency {
@@ -232,52 +88,55 @@ jobs:
               }
 
               var result []Dependency
-              file, err := os.ReadFile(filePath)
+              file, err := ioutil.ReadFile(filePath)
               if err != nil {
-                  fmt.Println("Error reading libs.versions.toml:", err)
+                  fmt.Println("Error reading Kotlin license report:", err)
                   return nil
               }
 
-              lines := strings.Split(string(file), "\n")
-              for _, line := range lines {
-                  if strings.Contains(line, "=") {
-                      parts := strings.Split(line, "=")
-                      pkg := strings.TrimSpace(parts[0])
-                      license, details := fetchKotlinLicense(pkg)
-                      result = append(result, Dependency{
-                          Name:     pkg,
-                          License:  license,
-                          Details:  details,
-                          Copyleft: isCopyleftLicense(license),
-                      })
+              var data []map[string]interface{}
+              if err := json.Unmarshal(file, &data); err != nil {
+                  fmt.Println("Error parsing Kotlin license report:", err)
+                  return nil
+              }
+
+              for _, dep := range data {
+                  name, _ := dep["moduleName"].(string)
+                  license, _ := dep["moduleLicense"].(string)
+                  if license == "" {
+                      license, _ = fetchLicenseFromOSSIndex(name)
                   }
+                  result = append(result, Dependency{
+                      Name:     name,
+                      License:  license,
+                      Details:  fmt.Sprintf("https://central.sonatype.com/artifact/%s", strings.ReplaceAll(name, ".", "/")),
+                      Copyleft: isCopyleftLicense(license),
+                  })
               }
               return result
           }
 
-          func fetchKotlinLicense(pkg string) (string, string) {
-              // Only using Approach 1: OSS Index API
-              ossIndexURL := fmt.Sprintf("https://ossindex.sonatype.org/api/v3/component-report/%s", pkg)
-              resp, err := http.Get(ossIndexURL)
-              if err != nil || resp.StatusCode != http.StatusOK {
-                  return "Unknown", ossIndexURL
+          func fetchLicenseFromOSSIndex(pkgName string) (string, error) {
+              url := fmt.Sprintf("https://ossindex.sonatype.org/api/v3/component-report/%s", pkgName)
+              resp, err := http.Get(url)
+              if err != nil {
+                  return "Unknown", err
               }
               defer resp.Body.Close()
 
-              var ossData []map[string]interface{}
-              json.NewDecoder(resp.Body).Decode(&ossData)
-
-              if len(ossData) > 0 {
-                  license, ok := ossData[0]["license"].(string)
-                  if ok {
-                      return license, ossIndexURL
-                  }
+              var data map[string]interface{}
+              if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+                  return "Unknown", err
               }
 
-              return "Unknown", ossIndexURL
+              coordinates, ok := data["coordinates"].(string)
+              if ok {
+                  return coordinates, nil
+              }
+              return "Unknown", nil
           }
 
-          func generateHTMLReport(nodeDeps, pythonDeps, kotlinDeps []Dependency) {
+          func generateHTMLReport(kotlinDeps []Dependency) {
               htmlContent := `
               <!DOCTYPE html>
               <html>
@@ -293,11 +152,7 @@ jobs:
               </head>
               <body>
                   <h1>Dependency License Report</h1>
-                  <h2>Node.js Dependencies</h2>` +
-                  generateTable(nodeDeps) +
-                  `<h2>Python Dependencies</h2>` +
-                  generateTable(pythonDeps) +
-                  `<h2>Kotlin Dependencies</h2>` +
+                  <h2>Kotlin Dependencies</h2>` +
                   generateTable(kotlinDeps) +
                   `</body>
               </html>`
@@ -337,11 +192,11 @@ jobs:
           go mod tidy
           go build -o ../checker
 
-      # Step 4: Run License Checker
+      # Step 6: Run License Checker
       - name: Run License Checker
         run: ./checker
 
-      # Step 5: Upload HTML Report
+      # Step 7: Upload HTML Report
       - name: Upload License Report
         uses: actions/upload-artifact@v4
         with:
