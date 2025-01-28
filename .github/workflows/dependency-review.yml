@@ -43,9 +43,9 @@ jobs:
           )
 
           type Dependency struct {
-              Name    string
-              License string
-              Details string
+              Name     string
+              License  string
+              Details  string
               Copyleft bool
           }
 
@@ -120,9 +120,9 @@ jobs:
               for name := range dependencies {
                   license, details := fetchNodeLicense(name)
                   result = append(result, Dependency{
-                      Name:    name,
-                      License: license,
-                      Details: details,
+                      Name:     name,
+                      License:  license,
+                      Details:  details,
                       Copyleft: isCopyleftLicense(license),
                   })
               }
@@ -184,9 +184,9 @@ jobs:
                   pkg := strings.Split(line, "==")[0]
                   license, details := fetchPythonLicense(pkg)
                   result = append(result, Dependency{
-                      Name:    pkg,
-                      License: license,
-                      Details: details,
+                      Name:     pkg,
+                      License:  license,
+                      Details:  details,
                       Copyleft: isCopyleftLicense(license),
                   })
               }
@@ -211,7 +211,6 @@ jobs:
 
               license, ok := info["license"].(string)
               if !ok || license == "" {
-                  // Check classifiers for license
                   classifiers, ok := info["classifiers"].([]interface{})
                   if ok {
                       for _, classifier := range classifiers {
@@ -241,24 +240,24 @@ jobs:
 
               lines := strings.Split(string(file), "\n")
               for _, line := range lines {
-                  if !strings.Contains(line, "=") {
-                      continue
+                  if strings.Contains(line, "=") {
+                      parts := strings.Split(line, "=")
+                      pkg := strings.TrimSpace(parts[0])
+                      license, details := fetchKotlinLicense(pkg)
+                      result = append(result, Dependency{
+                          Name:     pkg,
+                          License:  license,
+                          Details:  details,
+                          Copyleft: isCopyleftLicense(license),
+                      })
                   }
-                  parts := strings.Split(line, "=")
-                  pkg := strings.TrimSpace(parts[0])
-                  license, details := fetchKotlinLicense(pkg)
-                  result = append(result, Dependency{
-                      Name:    pkg,
-                      License: license,
-                      Details: details,
-                      Copyleft: isCopyleftLicense(license),
-                  })
               }
               return result
           }
 
           func fetchKotlinLicense(pkgName string) (string, string) {
-              url := fmt.Sprintf("https://mvnrepository.com/artifact/%s", pkgName)
+              base := "https://central.sonatype.com/artifact/"
+              url := base + strings.Replace(pkgName, ".", "/", -1)
               return "Unknown", url
           }
 
