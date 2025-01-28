@@ -211,7 +211,6 @@ jobs:
 
               license, ok := info["license"].(string)
               if !ok || license == "" {
-                  // Check classifiers for license
                   classifiers, ok := info["classifiers"].([]interface{})
                   if ok {
                       for _, classifier := range classifiers {
@@ -263,8 +262,7 @@ jobs:
           }
 
           func generateHTMLReport(nodeDeps, pythonDeps, kotlinDeps []Dependency) {
-              htmlContent := `
-              <!DOCTYPE html>
+              htmlContent := `<!DOCTYPE html>
               <html>
               <head>
                   <title>Dependency License Report</title>
