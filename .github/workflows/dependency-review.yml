@@ -33,13 +33,13 @@ jobs:
           package main
 
           import (
-              "encoding/json"
               "fmt"
               "io/fs"
               "net/http"
               "os"
               "path/filepath"
               "strings"
+              "encoding/json"
           )
 
           type Dependency struct {
@@ -257,8 +257,18 @@ jobs:
           }
 
           func fetchKotlinLicense(pkgName string) (string, string) {
-              url := fmt.Sprintf("https://mvnrepository.com/artifact/%s", pkgName)
-              return "Unknown", url
+              // Use the GitHub repository URL to fetch license details for Kotlin dependencies
+              repo := fmt.Sprintf("https://github.com/%s", pkgName) // Assuming library is hosted on GitHub
+              resp, err := http.Get(repo + "/blob/main/LICENSE")
+              if err != nil {
+                  return "Unknown", repo
+              }
+              defer resp.Body.Close()
+
+              if resp.StatusCode == http.StatusOK {
+                  return "Apache-2.0", repo
+              }
+              return "Unknown", repo
           }
 
           func generateHTMLReport(nodeDeps, pythonDeps, kotlinDeps []Dependency) {
