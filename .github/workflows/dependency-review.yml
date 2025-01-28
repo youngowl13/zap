@@ -46,6 +46,19 @@ jobs:
               Name    string
               License string
               Details string
+              Copyleft bool
+          }
+
+          var copyleftLicenses = []string{"GPL", "LGPL", "AGPL", "MPL", "CC-BY-SA", "EPL", "OFL", "CPL", "OSL", "APL"}
+
+          func isCopyleftLicense(license string) bool {
+              license = strings.ToUpper(license)
+              for _, copyleft := range copyleftLicenses {
+                  if strings.Contains(license, copyleft) {
+                      return true
+                  }
+              }
+              return false
           }
 
           func main() {
@@ -110,6 +123,7 @@ jobs:
                       Name:    name,
                       License: license,
                       Details: details,
+                      Copyleft: isCopyleftLicense(license),
                   })
               }
               return result
@@ -173,6 +187,7 @@ jobs:
                       Name:    pkg,
                       License: license,
                       Details: details,
+                      Copyleft: isCopyleftLicense(license),
                   })
               }
               return result
@@ -195,16 +210,20 @@ jobs:
               }
 
               license, ok := info["license"].(string)
-              if !ok {
-                  return "Unknown", url
+              if !ok || license == "" {
+                  // Check classifiers for license
+                  classifiers, ok := info["classifiers"].([]interface{})
+                  if ok {
+                      for _, classifier := range classifiers {
+                          if class, ok := classifier.(string); ok && strings.Contains(class, "License") {
+                              license = class
+                              break
+                          }
+                      }
+                  }
               }
 
-              projectURL, ok := info["project_url"].(string)
-              if !ok {
-                  return url, url
-              }
-
-              return license, projectURL
+              return license, url
           }
 
           func parseKotlinDependencies(filePath string) []Dependency {
@@ -232,6 +251,7 @@ jobs:
                       Name:    pkg,
                       License: license,
                       Details: details,
+                      Copyleft: isCopyleftLicense(license),
                   })
               }
               return result
@@ -283,11 +303,15 @@ jobs:
               </tr>`
 
               for _, dep := range dependencies {
-                  table += fmt.Sprintf(`<tr>
+                  class := "non-copyleft"
+                  if dep.Copyleft {
+                      class = "copyleft"
+                  }
+                  table += fmt.Sprintf(`<tr class="%s">
                       <td>%s</td>
                       <td>%s</td>
                       <td><a href="%s" target="_blank">View Details</a></td>
-                  </tr>`, dep.Name, dep.License, dep.Details)
+                  </tr>`, class, dep.Name, dep.License, dep.Details)
               }
 
               table += "</table>"
