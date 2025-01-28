@@ -15,34 +15,34 @@ jobs:
     steps:
       # Step 1: Checkout the repository
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
 
       # Step 2: Set up Node.js
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v3
         with:
           node-version: '18'
 
-      # Step 3: Set up Compatible Python
-      - name: Setup Compatible Python
+      # Step 3: Set up Python
+      - name: Setup Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.8'
+          python-version: '3.9'
 
       # Step 4: Install Node.js Dependencies
-      - name: Install Required Node.js Modules
-        run: npm install htmlparser2
+      - name: Install All Node.js Dependencies
+        run: npm install --legacy-peer-deps
 
-      # Step 5: Run License Analysis Script
+      # Step 5: Create and Run License Check Script Inline
       - name: Analyze Licenses
         run: |
           # Create the analyze-licenses.js script
           cat << 'EOF' > analyze-licenses.js
           const fs = require('fs');
-          const https = require('https');
-          const { parseDocument } = require('htmlparser2');
+          const path = require('path');
+          const axios = require('axios');
 
-          // Define copyleft licenses
+          // List of common copyleft licenses and variations
           const copyleftLicenses = [
               "GPL", "LGPL", "AGPL", "MPL", "CC-BY-SA", "EPL",
               "GPL-2.0", "GPL-3.0", "LGPL-2.1", "LGPL-3.0", "AGPL-3.0",
@@ -50,22 +50,27 @@ jobs:
               "EPL-1.0", "EPL-2.0", "OFL", "CPL", "OSL", "APL"
           ];
 
+          // Function to determine if a license is copyleft
           function isCopyleftLicense(license) {
-              return copyleftLicenses.some(copyleft => license?.toUpperCase().includes(copyleft));
+              return copyleftLicenses.some(copyleft => license.toUpperCase().includes(copyleft));
           }
 
-          function fetchNpmPackageInfo(packageName) {
-              const url = `https://registry.npmjs.org/${packageName}`;
-              return new Promise((resolve, reject) => {
-                  https.get(url, (res) => {
-                      let data = '';
-                      res.on('data', (chunk) => (data += chunk));
-                      res.on('end', () => resolve(JSON.parse(data)));
-                  }).on('error', (err) => reject(err));
-              });
+          // Function to recursively search for files
+          function findFile(dir, targetFile) {
+              const files = fs.readdirSync(dir, { withFileTypes: true });
+              for (const file of files) {
+                  const fullPath = path.join(dir, file.name);
+                  if (file.isFile() && file.name === targetFile) return fullPath;
+                  if (file.isDirectory()) {
+                      const found = findFile(fullPath, targetFile);
+                      if (found) return found;
+                  }
+              }
+              return null;
           }
 
-          async function analyzeDependencies() {
+          // Analyze Node.js dependencies
+          async function analyzeNodeDependencies() {
               const results = [];
               if (fs.existsSync('package.json')) {
                   const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf-8'));
@@ -73,17 +78,11 @@ jobs:
 
                   for (const [pkg, version] of Object.entries(dependencies)) {
                       try {
-                          const response = await fetchNpmPackageInfo(pkg);
-                          const latestVersion = response['dist-tags']?.latest || version;
-                          const license = response.versions[latestVersion]?.license || "Unknown";
+                          const response = await axios.get(`https://registry.npmjs.org/${pkg}`);
+                          const latestVersion = response.data['dist-tags']?.latest || version;
+                          const license = response.data.versions[latestVersion]?.license || "Unknown";
                           const npmUrl = `https://www.npmjs.com/package/${pkg}`;
-                          results.push({
-                              name: pkg,
-                              version: latestVersion,
-                              license,
-                              link: npmUrl,
-                              isCopyleft: isCopyleftLicense(license)
-                          });
+                          results.push({ type: 'Node.js', package: pkg, version: latestVersion, license, link: npmUrl, isCopyleft: isCopyleftLicense(license) });
                       } catch (error) {
                           console.error(`Failed to fetch details for ${pkg}: ${error.message}`);
                       }
@@ -92,15 +91,52 @@ jobs:
               return results;
           }
 
+          // Analyze Python dependencies
+          async function analyzePythonDependencies() {
+              const results = [];
+              const requirementsFile = findFile('.', 'requirements.txt');
+              if (requirementsFile) {
+                  const dependencies = fs.readFileSync(requirementsFile, 'utf-8').split('\n').filter(Boolean);
+                  for (const dependency of dependencies) {
+                      const packageName = dependency.split('==')[0];
+                      try {
+                          const response = await axios.get(`https://pypi.org/pypi/${packageName}/json`);
+                          const info = response.data.info;
+                          const license = info.license || "Unknown";
+                          const pypiUrl = info.project_url || `https://pypi.org/project/${packageName}`;
+                          results.push({ type: 'Python', package: packageName, version: dependency.split('==')[1] || "Latest", license, link: pypiUrl, isCopyleft: isCopyleftLicense(license) });
+                      } catch (error) {
+                          console.error(`Failed to fetch details for ${packageName}: ${error.message}`);
+                      }
+                  }
+              }
+              return results;
+          }
+
+          // Analyze Kotlin/Gradle dependencies
+          async function analyzeKotlinDependencies() {
+              const results = [];
+              const tomlFile = findFile('.', 'libs.versions.toml');
+              if (tomlFile) {
+                  const tomlContent = fs.readFileSync(tomlFile, 'utf-8');
+                  const matches = tomlContent.matchAll(/(?<name>[\w-]+)\s*=\s*["'](?<version>[^"']+)["']/g);
+                  for (const match of matches) {
+                      const { name, version } = match.groups;
+                      results.push({ type: 'Kotlin/Gradle', package: name, version, license: "Manual Check Required", link: "N/A", isCopyleft: false });
+                  }
+              }
+              return results;
+          }
+
           async function generateHtmlReport(results) {
-              const reportContent = `
+              const htmlContent = `
                   <!DOCTYPE html>
                   <html>
                   <head>
                       <title>Dependency License Report</title>
                       <style>
                           table { width: 100%; border-collapse: collapse; }
-                          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                          th, td { border: 1px solid #ddd; padding: 8px; }
                           th { background-color: #f2f2f2; }
                           .copyleft { background-color: #f8d7da; color: #721c24; }
                           .non-copyleft { background-color: #d4edda; color: #155724; }
@@ -110,6 +146,7 @@ jobs:
                       <h1>Dependency License Report</h1>
                       <table>
                           <tr>
+                              <th>Type</th>
                               <th>Package</th>
                               <th>Version</th>
                               <th>License</th>
@@ -117,21 +154,25 @@ jobs:
                           </tr>
                           ${results.map(r => `
                               <tr class="${r.isCopyleft ? 'copyleft' : 'non-copyleft'}">
-                                  <td>${r.name}</td>
+                                  <td>${r.type}</td>
+                                  <td>${r.package}</td>
                                   <td>${r.version}</td>
                                   <td>${r.license}</td>
-                                  <td><a href="${r.link}" target="_blank">View Details</a></td>
+                                  <td>${r.link !== "N/A" ? `<a href="${r.link}" target="_blank">View Details</a>` : "N/A"}</td>
                               </tr>`).join('')}
                       </table>
                   </body>
                   </html>
               `;
-              fs.writeFileSync('dependency-license-report.html', reportContent);
+              fs.writeFileSync('dependency-license-report.html', htmlContent);
           }
 
           async function main() {
-              const results = await analyzeDependencies();
-              await generateHtmlReport(results);
+              const nodeResults = await analyzeNodeDependencies();
+              const pythonResults = await analyzePythonDependencies();
+              const kotlinResults = await analyzeKotlinDependencies();
+              const allResults = [...nodeResults, ...pythonResults, ...kotlinResults];
+              await generateHtmlReport(allResults);
               console.log('HTML report generated as dependency-license-report.html');
           }
 
