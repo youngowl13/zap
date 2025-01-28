@@ -27,40 +27,33 @@ jobs:
       - name: Setup Compatible Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.8'  # Use Python 3.8.x for compatibility with node-gyp
+          python-version: '3.8'
 
       # Step 4: Export Python Path for node-gyp
       - name: Set PYTHON Environment Variable
         run: echo "PYTHON=/opt/hostedtoolcache/Python/3.8.*/x64/bin/python" >> $GITHUB_ENV
 
-      # Step 5: Debug Node.js and Python Versions
-      - name: Debug Node.js and Python Versions
+      # Step 5: Install Build Tools
+      - name: Install Build Tools
         run: |
-          node -v
-          npm -v
-          python --version
+          sudo apt-get update
+          sudo apt-get install -y build-essential python3-dev
 
-      # Step 6: Upgrade node-gyp to Latest Version
+      # Step 6: Upgrade node-gyp
       - name: Upgrade node-gyp
         run: npm install -g node-gyp@latest
 
-      # Step 7: Install Project Dependencies from package.json
-      - name: Install Node.js Dependencies
-        run: npm install --legacy-peer-deps
-
-      # Step 8: Install Additional Node.js Dependencies (cheerio, axios)
+      # Step 7: Install Node.js Dependencies Using Prebuilt Binaries
       - name: Install Additional Node.js Dependencies
-        run: npm install cheerio axios --force
+        run: npm install --force --build-from-source=false cheerio axios
 
-      # Step 9: Create and Run License Analysis Script
+      # Step 8: Run License Analysis Script
       - name: Analyze Licenses
         run: |
           # Create the analyze-licenses.js script
           cat << 'EOF' > analyze-licenses.js
           const fs = require('fs');
-          const axios = require('axios');
-          const cheerio = require('cheerio');
-          const path = require('path');
+          const https = require('https');
 
           // Define copyleft licenses
           const copyleftLicenses = [
@@ -71,7 +64,18 @@ jobs:
           ];
 
           function isCopyleftLicense(license) {
-              return copyleftLicenses.some(copyleft => license.toUpperCase().includes(copyleft));
+              return copyleftLicenses.some(copyleft => license?.toUpperCase().includes(copyleft));
+          }
+
+          function fetchNpmPackageInfo(packageName) {
+              const url = `https://registry.npmjs.org/${packageName}`;
+              return new Promise((resolve, reject) => {
+                  https.get(url, (res) => {
+                      let data = '';
+                      res.on('data', (chunk) => (data += chunk));
+                      res.on('end', () => resolve(JSON.parse(data)));
+                  }).on('error', (err) => reject(err));
+              });
           }
 
           async function analyzeDependencies() {
@@ -82,9 +86,9 @@ jobs:
 
                   for (const [pkg, version] of Object.entries(dependencies)) {
                       try {
-                          const response = await axios.get(`https://registry.npmjs.org/${pkg}`);
-                          const latestVersion = response.data['dist-tags']?.latest || version;
-                          const license = response.data.versions[latestVersion]?.license || "Unknown";
+                          const response = await fetchNpmPackageInfo(pkg);
+                          const latestVersion = response['dist-tags']?.latest || version;
+                          const license = response.versions[latestVersion]?.license || "Unknown";
                           const npmUrl = `https://www.npmjs.com/package/${pkg}`;
                           results.push({
                               name: pkg,
@@ -150,7 +154,7 @@ jobs:
           # Run the script
           node analyze-licenses.js
 
-      # Step 10: Upload License Report
+      # Step 9: Upload HTML Report
       - name: Upload License Report
         uses: actions/upload-artifact@v4
         with:
