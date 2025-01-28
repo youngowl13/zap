@@ -30,7 +30,7 @@ jobs:
           cat << 'EOF' > analyze-licenses.js
           const fs = require('fs');
           const path = require('path');
-          const https = require('https');
+          const axios = require('axios');
 
           const copyleftLicenses = [
               "GPL", "LGPL", "AGPL", "MPL", "CC-BY-SA", "EPL",
@@ -57,31 +57,21 @@ jobs:
           }
 
           async function fetchKotlinLicenseFromSonatype(group, artifact, version) {
-              return new Promise((resolve, reject) => {
+              try {
                   const searchUrl = `https://central.sonatype.com/artifact/${group}/${artifact}/${version}`;
-                  https.get(searchUrl, (res) => {
-                      let data = '';
-                      res.on('data', (chunk) => {
-                          data += chunk;
-                      });
-                      res.on('end', () => {
-                          try {
-                              const licenseMatch = data.match(/<span class="license-name">([^<]+)<\/span>/);
-                              if (licenseMatch && licenseMatch[1]) {
-                                  resolve(licenseMatch[1].trim());
-                              } else {
-                                  resolve("Unknown");
-                              }
-                          } catch (error) {
-                              console.error(`Error parsing license data for ${group}:${artifact}:${version}:`, error);
-                              resolve("Unknown");
-                          }
-                      });
-                  }).on('error', (error) => {
-                      console.error(`Error fetching license for ${group}:${artifact}:${version}:`, error.message);
-                      resolve("Unknown");
-                  });
-              });
+                  const response = await axios.get(searchUrl);
+                  const htmlContent = response.data;
+                  const licenseMatch = htmlContent.match(/<span class="license-name">([^<]+)<\/span>/);
+
+                  if (licenseMatch && licenseMatch[1]) {
+                      return licenseMatch[1].trim();
+                  } else {
+                      return "Unknown";
+                  }
+              } catch (error) {
+                  console.error(`Error fetching license for ${group}:${artifact}:${version}:`, error.message);
+                  return "Unknown";
+              }
           }
 
           async function analyzeKotlinDependencies() {
