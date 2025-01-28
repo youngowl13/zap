@@ -29,7 +29,11 @@ jobs:
         with:
           python-version: '3.8'
 
-      # Step 4: Run License Analysis Script
+      # Step 4: Install Node.js Dependencies
+      - name: Install Required Node.js Modules
+        run: npm install htmlparser2
+
+      # Step 5: Run License Analysis Script
       - name: Analyze Licenses
         run: |
           # Create the analyze-licenses.js script
@@ -137,7 +141,7 @@ jobs:
           # Run the script
           node analyze-licenses.js
 
-      # Step 5: Upload HTML Report
+      # Step 6: Upload HTML Report
       - name: Upload License Report
         uses: actions/upload-artifact@v4
         with:
