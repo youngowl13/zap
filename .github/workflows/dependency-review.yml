@@ -29,31 +29,14 @@ jobs:
         with:
           python-version: '3.8'
 
-      # Step 4: Export Python Path for node-gyp
-      - name: Set PYTHON Environment Variable
-        run: echo "PYTHON=/opt/hostedtoolcache/Python/3.8.*/x64/bin/python" >> $GITHUB_ENV
-
-      # Step 5: Install Build Tools
-      - name: Install Build Tools
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential python3-dev
-
-      # Step 6: Upgrade node-gyp
-      - name: Upgrade node-gyp
-        run: npm install -g node-gyp@latest
-
-      # Step 7: Install Node.js Dependencies Using Prebuilt Binaries
-      - name: Install Additional Node.js Dependencies
-        run: npm install --force --build-from-source=false cheerio axios
-
-      # Step 8: Run License Analysis Script
+      # Step 4: Run License Analysis Script
       - name: Analyze Licenses
         run: |
           # Create the analyze-licenses.js script
           cat << 'EOF' > analyze-licenses.js
           const fs = require('fs');
           const https = require('https');
+          const { parseDocument } = require('htmlparser2');
 
           // Define copyleft licenses
           const copyleftLicenses = [
@@ -154,7 +137,7 @@ jobs:
           # Run the script
           node analyze-licenses.js
 
-      # Step 9: Upload HTML Report
+      # Step 5: Upload HTML Report
       - name: Upload License Report
         uses: actions/upload-artifact@v4
         with:
