@@ -23,15 +23,15 @@ jobs:
         with:
           node-version: '18'
 
-      # Step 3: Set up Compatible Python for node-gyp
+      # Step 3: Set up Compatible Python
       - name: Setup Compatible Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.8'  # Use Python 3.8.x for compatibility with node-gyp
 
-      # Step 4: Configure Python for node-gyp
-      - name: Configure Python for node-gyp
-        run: npm config set python /opt/hostedtoolcache/Python/3.8.*/x64/bin/python
+      # Step 4: Export Python Path for node-gyp
+      - name: Set PYTHON Environment Variable
+        run: echo "PYTHON=/opt/hostedtoolcache/Python/3.8.*/x64/bin/python" >> $GITHUB_ENV
 
       # Step 5: Debug Node.js and Python Versions
       - name: Debug Node.js and Python Versions
