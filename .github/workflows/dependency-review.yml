@@ -256,24 +256,25 @@ jobs:
           }
 
           func fetchKotlinLicense(pkg string) (string, string) {
-              // First try Approach 1: OSS Index API
+              // Only using Approach 1: OSS Index API
               ossIndexURL := fmt.Sprintf("https://ossindex.sonatype.org/api/v3/component-report/%s", pkg)
               resp, err := http.Get(ossIndexURL)
-              if err == nil && resp.StatusCode == http.StatusOK {
-                  var ossData []map[string]interface{}
-                  json.NewDecoder(resp.Body).Decode(&ossData)
-                  if len(ossData) > 0 {
-                      license, ok := ossData[0]["license"].(string)
-                      if ok {
-                          return license, ossIndexURL
-                      }
-                  }
+              if err != nil || resp.StatusCode != http.StatusOK {
+                  return "Unknown", ossIndexURL
               }
               defer resp.Body.Close()
 
-              // Fallback to Approach 2: Central Maven Repository
-              mavenURL := fmt.Sprintf("https://central.sonatype.com/artifact/%s", pkg)
-              return "Unknown", mavenURL
+              var ossData []map[string]interface{}
+              json.NewDecoder(resp.Body).Decode(&ossData)
+
+              if len(ossData) > 0 {
+                  license, ok := ossData[0]["license"].(string)
+                  if ok {
+                      return license, ossIndexURL
+                  }
+              }
+
+              return "Unknown", ossIndexURL
           }
 
           func generateHTMLReport(nodeDeps, pythonDeps, kotlinDeps []Dependency) {
@@ -301,10 +302,7 @@ jobs:
                   `</body>
               </html>`
 
-              err := os.WriteFile("dependency-license-report.html", []byte(htmlContent), 0644)
-              if err != nil {
-                  fmt.Printf("Error writing HTML file: %v\n", err)
-              }
+              os.WriteFile("dependency-license-report.html", []byte(htmlContent), 0644)
           }
 
           func generateTable(dependencies []Dependency) string {
