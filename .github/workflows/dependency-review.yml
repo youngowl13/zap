@@ -23,38 +23,46 @@ jobs:
         with:
           node-version: '18'
 
-      # Step 3: Set up Python
-      - name: Setup Python
+      # Step 3: Set up Compatible Python for node-gyp
+      - name: Setup Compatible Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.9'
+          python-version: '3.8'  # Use Python 3.8.x for compatibility with node-gyp
 
-      # Step 4: Check Node.js and NPM Versions
-      - name: Debug Node.js and NPM Setup
+      # Step 4: Configure Python for node-gyp
+      - name: Configure Python for node-gyp
+        run: npm config set python /opt/hostedtoolcache/Python/3.8.*/x64/bin/python
+
+      # Step 5: Debug Node.js and Python Versions
+      - name: Debug Node.js and Python Versions
         run: |
           node -v
           npm -v
+          python --version
 
-      # Step 5: Install Node.js Dependencies
-      # Install project dependencies from package.json
+      # Step 6: Upgrade node-gyp to Latest Version
+      - name: Upgrade node-gyp
+        run: npm install -g node-gyp@latest
+
+      # Step 7: Install Project Dependencies from package.json
       - name: Install Node.js Dependencies
         run: npm install --legacy-peer-deps
 
-      # Step 6: Install Additional Node.js Dependencies
-      # Install additional dependencies (cheerio, axios) required for the script
+      # Step 8: Install Additional Node.js Dependencies (cheerio, axios)
       - name: Install Additional Node.js Dependencies
         run: npm install cheerio axios --force
 
-      # Step 7: Create and Run License Analysis Script
+      # Step 9: Create and Run License Analysis Script
       - name: Analyze Licenses
         run: |
           # Create the analyze-licenses.js script
           cat << 'EOF' > analyze-licenses.js
           const fs = require('fs');
-          const path = require('path');
           const axios = require('axios');
           const cheerio = require('cheerio');
+          const path = require('path');
 
+          // Define copyleft licenses
           const copyleftLicenses = [
               "GPL", "LGPL", "AGPL", "MPL", "CC-BY-SA", "EPL",
               "GPL-2.0", "GPL-3.0", "LGPL-2.1", "LGPL-3.0", "AGPL-3.0",
@@ -66,132 +74,83 @@ jobs:
               return copyleftLicenses.some(copyleft => license.toUpperCase().includes(copyleft));
           }
 
-          function findFileRecursively(dir, fileName) {
-              const files = fs.readdirSync(dir, { withFileTypes: true });
-              for (const file of files) {
-                  const fullPath = path.join(dir, file.name);
-                  if (file.isFile() && file.name === fileName) {
-                      return fullPath;
-                  }
-                  if (file.isDirectory()) {
-                      const found = findFileRecursively(fullPath, fileName);
-                      if (found) return found;
-                  }
-              }
-              return null;
-          }
-
-          function parseToml(filePath) {
-              const toml = fs.readFileSync(filePath, 'utf-8');
-              const sections = {};
-              let currentSection = null;
-
-              toml.split('\n').forEach(line => {
-                  line = line.trim();
-                  if (line.startsWith('[')) {
-                      currentSection = line.replace(/\[|\]/g, '').trim();
-                      sections[currentSection] = {};
-                  } else if (line && currentSection) {
-                      const [key, value] = line.split('=').map(part => part.trim());
-                      sections[currentSection][key] = value.replace(/"|'/g, '');
-                  }
-              });
-
-              return sections;
-          }
-
-          async function analyzePythonDependencies() {
+          async function analyzeDependencies() {
               const results = [];
-              const requirementsFile = findFileRecursively('.', 'requirements.txt') || findFileRecursively('.', 'requirement.txt');
+              if (fs.existsSync('package.json')) {
+                  const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf-8'));
+                  const dependencies = { ...packageJson.dependencies, ...packageJson.devDependencies };
 
-              if (!requirementsFile) {
-                  console.log("No Python dependencies found.");
-                  return { results, message: "No Python dependencies found." };
-              }
-
-              console.log(`Analyzing Python dependencies from ${requirementsFile}...`);
-              const dependencies = fs.readFileSync(requirementsFile, 'utf-8').split('\n').filter(Boolean);
-
-              for (const dependency of dependencies) {
-                  const packageName = dependency.split('==')[0];
-                  try {
-                      const response = await axios.get(`https://pypi.org/pypi/${packageName}/json`);
-                      const info = response.data.info;
-                      const license = info.license || "Unknown";
-                      const detailsUrl = info.project_url || `https://pypi.org/project/${packageName}`;
-
-                      const copyleft = isCopyleftLicense(license);
-                      results.push({ packageName, license, detailsUrl, copyleft });
-                  } catch (error) {
-                      console.error(`Error fetching details for ${packageName}: ${error.message}`);
+                  for (const [pkg, version] of Object.entries(dependencies)) {
+                      try {
+                          const response = await axios.get(`https://registry.npmjs.org/${pkg}`);
+                          const latestVersion = response.data['dist-tags']?.latest || version;
+                          const license = response.data.versions[latestVersion]?.license || "Unknown";
+                          const npmUrl = `https://www.npmjs.com/package/${pkg}`;
+                          results.push({
+                              name: pkg,
+                              version: latestVersion,
+                              license,
+                              link: npmUrl,
+                              isCopyleft: isCopyleftLicense(license)
+                          });
+                      } catch (error) {
+                          console.error(`Failed to fetch details for ${pkg}: ${error.message}`);
+                      }
                   }
               }
-              return { results, message: "" };
+              return results;
           }
 
-          async function generateHtmlReport() {
-              const pythonAnalysis = await analyzePythonDependencies();
-
-              const htmlContent = `
+          async function generateHtmlReport(results) {
+              const reportContent = `
                   <!DOCTYPE html>
                   <html>
                   <head>
                       <title>Dependency License Report</title>
                       <style>
-                          table {
-                              width: 100%;
-                              border-collapse: collapse;
-                          }
-                          th, td {
-                              border: 1px solid #ddd;
-                              padding: 8px;
-                          }
-                          th {
-                              background-color: #f2f2f2;
-                          }
-                          .copyleft {
-                              background-color: #f8d7da;
-                              color: #721c24;
-                          }
-                          .non-copyleft {
-                              background-color: #d4edda;
-                              color: #155724;
-                          }
+                          table { width: 100%; border-collapse: collapse; }
+                          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                          th { background-color: #f2f2f2; }
+                          .copyleft { background-color: #f8d7da; color: #721c24; }
+                          .non-copyleft { background-color: #d4edda; color: #155724; }
                       </style>
                   </head>
                   <body>
                       <h1>Dependency License Report</h1>
-
-                      <h2>Python Dependencies</h2>
                       <table>
                           <tr>
                               <th>Package</th>
+                              <th>Version</th>
                               <th>License</th>
                               <th>Details</th>
                           </tr>
-                          ${pythonAnalysis.results.map(dep => `
-                              <tr class="${dep.copyleft ? 'copyleft' : 'non-copyleft'}">
-                                  <td>${dep.packageName}</td>
-                                  <td>${dep.license}</td>
-                                  <td><a href="${dep.detailsUrl}" target="_blank">Details</a></td>
-                              </tr>
-                          `).join('')}
+                          ${results.map(r => `
+                              <tr class="${r.isCopyleft ? 'copyleft' : 'non-copyleft'}">
+                                  <td>${r.name}</td>
+                                  <td>${r.version}</td>
+                                  <td>${r.license}</td>
+                                  <td><a href="${r.link}" target="_blank">View Details</a></td>
+                              </tr>`).join('')}
                       </table>
                   </body>
                   </html>
               `;
-
-              fs.writeFileSync('dependency-license-report.html', htmlContent);
-              console.log('Report generated: dependency-license-report.html');
+              fs.writeFileSync('dependency-license-report.html', reportContent);
           }
 
-          generateHtmlReport();
+          async function main() {
+              const results = await analyzeDependencies();
+              await generateHtmlReport(results);
+              console.log('HTML report generated as dependency-license-report.html');
+          }
+
+          main().catch(err => console.error(err));
           EOF
 
           # Run the script
           node analyze-licenses.js
 
-      # Step 8: Upload HTML Report as an Artifact
+      # Step 10: Upload License Report
       - name: Upload License Report
         uses: actions/upload-artifact@v4
         with:
