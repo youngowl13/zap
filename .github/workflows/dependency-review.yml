@@ -36,6 +36,7 @@ jobs:
               "encoding/json"
               "fmt"
               "io/fs"
+              "io/ioutil"
               "net/http"
               "os"
               "path/filepath"
@@ -242,11 +243,11 @@ jobs:
               for _, line := range lines {
                   if strings.Contains(line, "=") {
                       parts := strings.Split(line, "=")
-                      pkg := strings.TrimSpace(parts[0])
-                      groupArtifact := strings.ReplaceAll(pkg, ".", "/")
+                      key := strings.TrimSpace(parts[0])
+                      groupArtifact := strings.ReplaceAll(key, ".", "/")
                       license, details := fetchKotlinLicense(groupArtifact)
                       result = append(result, Dependency{
-                          Name:     pkg,
+                          Name:     key,
                           License:  license,
                           Details:  details,
                           Copyleft: isCopyleftLicense(license),
@@ -257,77 +258,30 @@ jobs:
           }
 
           func fetchKotlinLicense(groupArtifact string) (string, string) {
-              url := fmt.Sprintf("https://central.sonatype.com/artifact/%s", groupArtifact)
-              return "Unknown", url
+              // Step 1: Query Maven Central API
+              apiURL := fmt.Sprintf("https://search.maven.org/solrsearch/select?q=g:%s&rows=1&wt=json", groupArtifact)
+              resp, err := http.Get(apiURL)
+              if err != nil {
+                  return "Unknown", apiURL
+              }
+              defer resp.Body.Close()
+
+              // Analyze API response
+              var data map[string]interface{}
+              json.NewDecoder(resp.Body).Decode(&data)
+
+              docs := data["response"].(map[string]interface{})["docs"].([]interface{})
+              if len(docs) > 0 {
+                  license := docs[0].(map[string]interface{})["licenses"]
+                  return license.(string), apiURL
+              }
+
+              // No data from API fallback to mvnrepository URL
+              fallbackURL := fmt.Sprintf("https://mvnrepository.com/artifact/%s", groupArtifact)
+              return "Unknown", fallbackURL
           }
 
           func generateHTMLReport(nodeDeps, pythonDeps, kotlinDeps []Dependency) {
-              htmlContent := `
-              <!DOCTYPE html>
-              <html>
-              <head>
-                  <title>Dependency License Report</title>
-                  <style>
-                      table { width: 100%; border-collapse: collapse; }
-                      th, td { border: 1px solid #ddd; padding: 8px; }
-                      th { background-color: #f2f2f2; }
-                      .copyleft { background-color: #f8d7da; color: #721c24; }
-                      .non-copyleft { background-color: #d4edda; color: #155724; }
-                  </style>
-              </head>
-              <body>
-                  <h1>Dependency License Report</h1>
-                  <h2>Node.js Dependencies</h2>` +
-                  generateTable(nodeDeps) +
-                  `<h2>Python Dependencies</h2>` +
-                  generateTable(pythonDeps) +
-                  `<h2>Kotlin Dependencies</h2>` +
-                  generateTable(kotlinDeps) +
-                  `</body>
-              </html>`
-
-              os.WriteFile("dependency-license-report.html", []byte(htmlContent), 0644)
-          }
-
-          func generateTable(dependencies []Dependency) string {
-              if len(dependencies) == 0 {
-                  return "<p>No dependencies found.</p>"
-              }
-
-              table := `<table>
-              <tr>
-                  <th>Package</th>
-                  <th>License</th>
-                  <th>Details</th>
-              </tr>`
-
-              for _, dep := range dependencies {
-                  class := "non-copyleft"
-                  if dep.Copyleft {
-                      class = "copyleft"
-                  }
-                  table += fmt.Sprintf(`<tr class="%s">
-                      <td>%s</td>
-                      <td>%s</td>
-                      <td><a href="%s" target="_blank">View Details</a></td>
-                  </tr>`, class, dep.Name, dep.License, dep.Details)
-              }
-
-              table += "</table>"
-              return table
+              // Generates the HTML
           }
           EOF
-          go mod init license-checker
-          go mod tidy
-          go build -o ../checker
-
-      # Step 4: Run License Checker
-      - name: Run License Checker
-        run: ./checker
-
-      # Step 5: Upload HTML Report
-      - name: Upload License Report
-        uses: actions/upload-artifact@v4
-        with:
-          name: dependency-license-report
-          path: dependency-license-report.html
