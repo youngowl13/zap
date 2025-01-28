@@ -98,7 +98,12 @@ jobs:
                   return nil
               }
 
-              dependencies := data["dependencies"].(map[string]interface{})
+              dependencies, ok := data["dependencies"].(map[string]interface{})
+              if !ok {
+                  fmt.Println("No dependencies found in package.json.")
+                  return nil
+              }
+
               for name := range dependencies {
                   license, details := fetchNodeLicense(name)
                   result = append(result, Dependency{
@@ -121,9 +126,26 @@ jobs:
               var data map[string]interface{}
               json.NewDecoder(resp.Body).Decode(&data)
 
-              latest := data["dist-tags"].(map[string]interface{})["latest"].(string)
-              version := data["versions"].(map[string]interface{})[latest].(map[string]interface{})
-              license := version["license"].(string)
+              latestTag, ok := data["dist-tags"].(map[string]interface{})["latest"].(string)
+              if !ok {
+                  return "Unknown", url
+              }
+
+              versions, ok := data["versions"].(map[string]interface{})
+              if !ok {
+                  return "Unknown", url
+              }
+
+              versionData, ok := versions[latestTag].(map[string]interface{})
+              if !ok {
+                  return "Unknown", url
+              }
+
+              license, ok := versionData["license"].(string)
+              if !ok {
+                  return "Unknown", url
+              }
+
               return license, fmt.Sprintf("https://www.npmjs.com/package/%s", pkgName)
           }
 
@@ -167,9 +189,21 @@ jobs:
               var data map[string]interface{}
               json.NewDecoder(resp.Body).Decode(&data)
 
-              info := data["info"].(map[string]interface{})
-              license := info["license"].(string)
-              projectURL := info["project_url"].(string)
+              info, ok := data["info"].(map[string]interface{})
+              if !ok {
+                  return "Unknown", url
+              }
+
+              license, ok := info["license"].(string)
+              if !ok {
+                  return "Unknown", url
+              }
+
+              projectURL, ok := info["project_url"].(string)
+              if !ok {
+                  return url, url
+              }
+
               return license, projectURL
           }
 
