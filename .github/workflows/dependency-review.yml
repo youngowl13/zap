@@ -183,12 +183,12 @@ jobs:
           }
           EOF
           cd ..
-          go build -o license-checker ./license-checker/main.go
+          go build -o checker ./license-checker/main.go
 
       # Step 4: Run License Checker
       - name: Run License Checker
         run: |
-          ./license-checker
+          ./checker
 
       # Step 5: Upload License Report
       - name: Upload License Report
