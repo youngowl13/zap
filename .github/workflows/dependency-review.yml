@@ -243,7 +243,8 @@ jobs:
                   if strings.Contains(line, "=") {
                       parts := strings.Split(line, "=")
                       pkg := strings.TrimSpace(parts[0])
-                      license, details := fetchKotlinLicense(pkg)
+                      groupArtifact := strings.ReplaceAll(pkg, ".", "/")
+                      license, details := fetchKotlinLicense(groupArtifact)
                       result = append(result, Dependency{
                           Name:     pkg,
                           License:  license,
@@ -255,9 +256,8 @@ jobs:
               return result
           }
 
-          func fetchKotlinLicense(pkgName string) (string, string) {
-              base := "https://central.sonatype.com/artifact/"
-              url := base + strings.Replace(pkgName, ".", "/", -1)
+          func fetchKotlinLicense(groupArtifact string) (string, string) {
+              url := fmt.Sprintf("https://central.sonatype.com/artifact/%s", groupArtifact)
               return "Unknown", url
           }
 
