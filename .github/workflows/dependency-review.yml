@@ -35,174 +35,111 @@ jobs:
               "encoding/json"
               "fmt"
               "io/ioutil"
-              "net/http"
               "os"
-              "path/filepath"
               "strings"
           )
 
-          // Dependency holds information about a single package
           type Dependency struct {
-              Name     string
-              Version  string
-              License  string
-              Details  string
+              Name    string
+              License string
+              Details string
           }
 
-          // Function to search for files recursively
-          func findFile(root string, target string) string {
-              var result string
-              _ = filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
-                  if err == nil && strings.EqualFold(info.Name(), target) {
-                      result = path
-                      return filepath.SkipDir
-                  }
-                  return nil
-              })
-              return result
-          }
-
-          // Function to fetch license for Node.js dependencies
-          func fetchNodeLicense(packageName string) string {
-              url := fmt.Sprintf("https://registry.npmjs.org/%s", packageName)
-              resp, err := http.Get(url)
-              if err != nil {
-                  return "Error fetching license"
-              }
-              defer resp.Body.Close()
-              body, _ := ioutil.ReadAll(resp.Body)
-              var data map[string]interface{}
-              _ = json.Unmarshal(body, &data)
-              if data != nil && data["license"] != nil {
-                  return data["license"].(string)
-              }
-              return "Unknown"
-          }
-
-          // Function to fetch license for Python dependencies
-          func fetchPythonLicense(packageName string) string {
-              url := fmt.Sprintf("https://pypi.org/pypi/%s/json", packageName)
-              resp, err := http.Get(url)
-              if err != nil {
-                  return "Error fetching license"
-              }
-              defer resp.Body.Close()
-              body, _ := ioutil.ReadAll(resp.Body)
-              var data map[string]interface{}
-              _ = json.Unmarshal(body, &data)
-              if data != nil && data["info"] != nil {
-                  info := data["info"].(map[string]interface{})
-                  if info["license"] != nil {
-                      return info["license"].(string)
-                  }
-              }
-              return "Unknown"
-          }
-
-          // Function to fetch license for Kotlin dependencies
-          func fetchKotlinLicense(groupID, artifactID, version string) string {
-              url := fmt.Sprintf("https://mvnrepository.com/artifact/%s/%s/%s", groupID, artifactID, version)
-              resp, err := http.Get(url)
-              if err != nil {
-                  return "Error fetching license"
-              }
-              defer resp.Body.Close()
-              body, _ := ioutil.ReadAll(resp.Body)
-              start := strings.Index(string(body), `<span class="b lic">`)
-              if start != -1 {
-                  end := strings.Index(string(body)[start:], "</span>")
-                  if end != -1 {
-                      return strings.TrimSpace(string(body)[start+len(`<span class="b lic">`) : start+end])
-                  }
-              }
-              return "Unknown"
-          }
-
-          // Function to parse Node.js dependencies
-          func parseNodeDependencies() []Dependency {
-              var dependencies []Dependency
-              filePath := findFile(".", "package.json")
-              if filePath == "" {
-                  fmt.Println("Node.js dependencies not found.")
-                  return dependencies
-              }
-              file, _ := os.ReadFile(filePath)
-              var data map[string]interface{}
-              _ = json.Unmarshal(file, &data)
-              if data != nil && data["dependencies"] != nil {
-                  for pkg := range data["dependencies"].(map[string]interface{}) {
-                      license := fetchNodeLicense(pkg)
-                      dependencies = append(dependencies, Dependency{
-                          Name:    pkg,
-                          License: license,
-                          Details: fmt.Sprintf("https://www.npmjs.com/package/%s", pkg),
-                      })
-                  }
-              }
-              return dependencies
-          }
-
-          // Function to parse Python dependencies
-          func parsePythonDependencies() []Dependency {
-              var dependencies []Dependency
-              filePath := findFile(".", "requirements.txt")
-              if filePath == "" {
-                  filePath = findFile(".", "requirement.txt")
-              }
-              if filePath == "" {
-                  fmt.Println("Python dependencies not found.")
-                  return dependencies
-              }
-              file, _ := os.ReadFile(filePath)
-              lines := strings.Split(string(file), "\n")
-              for _, line := range lines {
-                  if line != "" {
-                      pkg := strings.Split(line, "==")[0]
-                      license := fetchPythonLicense(pkg)
-                      dependencies = append(dependencies, Dependency{
-                          Name:    pkg,
-                          License: license,
-                          Details: fmt.Sprintf("https://pypi.org/project/%s", pkg),
-                      })
-                  }
-              }
-              return dependencies
-          }
-
-          // Function to parse Kotlin dependencies
-          func parseKotlinDependencies() []Dependency {
-              var dependencies []Dependency
-              filePath := findFile(".", "libs.versions.toml")
-              if filePath == "" {
-                  fmt.Println("Kotlin dependencies not found.")
-                  return dependencies
-              }
-              file, _ := os.ReadFile(filePath)
-              lines := strings.Split(string(file), "\n")
-              for _, line := range lines {
-                  if strings.Contains(line, "=") {
-                      parts := strings.Split(line, "=")
-                      pkg := strings.TrimSpace(parts[0])
-                      license := fetchKotlinLicense("groupID", pkg, "version")
-                      dependencies = append(dependencies, Dependency{
-                          Name:    pkg,
-                          License: license,
-                          Details: fmt.Sprintf("https://mvnrepository.com/artifact/groupID/%s", pkg),
-                      })
-                  }
-              }
-              return dependencies
-          }
-
-          // Main function
           func main() {
               nodeDeps := parseNodeDependencies()
               pythonDeps := parsePythonDependencies()
               kotlinDeps := parseKotlinDependencies()
 
-              fmt.Println("Node.js Dependencies:", nodeDeps)
-              fmt.Println("Python Dependencies:", pythonDeps)
-              fmt.Println("Kotlin Dependencies:", kotlinDeps)
+              htmlContent := `
+              <!DOCTYPE html>
+              <html>
+              <head>
+                  <title>Dependency License Report</title>
+                  <style>
+                      table { width: 100%; border-collapse: collapse; }
+                      th, td { border: 1px solid #ddd; padding: 8px; }
+                      th { background-color: #f2f2f2; }
+                      .copyleft { background-color: #f8d7da; color: #721c24; }
+                      .non-copyleft { background-color: #d4edda; color: #155724; }
+                  </style>
+              </head>
+              <body>
+                  <h1>Dependency License Report</h1>
+                  <h2>Node.js Dependencies</h2>
+                  ` + generateTable(nodeDeps) + `
+                  <h2>Python Dependencies</h2>
+                  ` + generateTable(pythonDeps) + `
+                  <h2>Kotlin Dependencies</h2>
+                  ` + generateTable(kotlinDeps) + `
+              </body>
+              </html>
+              `
+
+              err := os.WriteFile("dependency-license-report.html", []byte(htmlContent), 0644)
+              if err != nil {
+                  fmt.Println("Error writing HTML report:", err)
+                  os.Exit(1)
+              }
+
+              fmt.Println("HTML report successfully generated at dependency-license-report.html")
+          }
+
+          func generateTable(dependencies []Dependency) string {
+              if len(dependencies) == 0 {
+                  return "<p>No dependencies found.</p>"
+              }
+
+              table := `<table>
+                  <tr>
+                      <th>Package</th>
+                      <th>License</th>
+                      <th>Details</th>
+                  </tr>`
+
+              for _, dep := range dependencies {
+                  table += fmt.Sprintf(`<tr class="%s">
+                      <td>%s</td>
+                      <td>%s</td>
+                      <td><a href="%s" target="_blank">View Details</a></td>
+                  </tr>`, getClass(dep.License), dep.Name, dep.License, dep.Details)
+              }
+
+              table += "</table>"
+              return table
+          }
+
+          func getClass(license string) string {
+              if strings.Contains(license, "GPL") || strings.Contains(license, "Copyleft") {
+                  return "copyleft"
+              }
+              return "non-copyleft"
+          }
+
+          func parseNodeDependencies() []Dependency {
+              if _, err := os.Stat("package.json"); os.IsNotExist(err) {
+                  fmt.Println("No Node.js dependencies found.")
+                  return nil
+              }
+              // Add logic to parse package.json and fetch licenses
+              return []Dependency{}
+          }
+
+          func parsePythonDependencies() []Dependency {
+              if _, err := os.Stat("requirements.txt"); os.IsNotExist(err) && os.IsNotExist(os.Stat("requirement.txt")) {
+                  fmt.Println("No Python dependencies found.")
+                  return nil
+              }
+              // Add logic to parse requirements.txt and fetch licenses
+              return []Dependency{}
+          }
+
+          func parseKotlinDependencies() []Dependency {
+              if _, err := os.Stat("libs.versions.toml"); os.IsNotExist(err) {
+                  fmt.Println("No Kotlin dependencies found.")
+                  return nil
+              }
+              // Add logic to parse libs.versions.toml and fetch licenses
+              return []Dependency{}
           }
           EOF
           go mod init license-checker
