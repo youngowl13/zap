@@ -82,7 +82,7 @@ jobs:
                           const latestVersion = response.data['dist-tags']?.latest || version;
                           const license = response.data.versions[latestVersion]?.license || "Unknown";
                           const npmUrl = `https://www.npmjs.com/package/${pkg}`;
-                          results.push({ type: 'Node.js', package: pkg, version: latestVersion, license, link: npmUrl, isCopyleft: isCopyleftLicense(license) });
+                          results.push({ package: pkg, version: latestVersion, license, link: npmUrl, isCopyleft: isCopyleftLicense(license) });
                       } catch (error) {
                           console.error(`Failed to fetch details for ${pkg}: ${error.message}`);
                       }
@@ -104,7 +104,7 @@ jobs:
                           const info = response.data.info;
                           const license = info.license || "Unknown";
                           const pypiUrl = info.project_url || `https://pypi.org/project/${packageName}`;
-                          results.push({ type: 'Python', package: packageName, version: dependency.split('==')[1] || "Latest", license, link: pypiUrl, isCopyleft: isCopyleftLicense(license) });
+                          results.push({ package: packageName, version: dependency.split('==')[1] || "Latest", license, link: pypiUrl, isCopyleft: isCopyleftLicense(license) });
                       } catch (error) {
                           console.error(`Failed to fetch details for ${packageName}: ${error.message}`);
                       }
@@ -122,13 +122,34 @@ jobs:
                   const matches = tomlContent.matchAll(/(?<name>[\w-]+)\s*=\s*["'](?<version>[^"']+)["']/g);
                   for (const match of matches) {
                       const { name, version } = match.groups;
-                      results.push({ type: 'Kotlin/Gradle', package: name, version, license: "Manual Check Required", link: "N/A", isCopyleft: false });
+                      results.push({ package: name, version, license: "Manual Check Required", link: "N/A", isCopyleft: false });
                   }
               }
               return results;
           }
 
-          async function generateHtmlReport(results) {
+          async function generateHtmlReport(nodeResults, pythonResults, kotlinResults) {
+              const createTable = (heading, results) => `
+                  <h2>${heading}</h2>
+                  ${results.length === 0 ? `<p>No dependencies found for ${heading}.</p>` : `
+                      <table>
+                          <tr>
+                              <th>Package</th>
+                              <th>Version</th>
+                              <th>License</th>
+                              <th>Details</th>
+                          </tr>
+                          ${results.map(r => `
+                              <tr class="${r.isCopyleft ? 'copyleft' : 'non-copyleft'}">
+                                  <td>${r.package}</td>
+                                  <td>${r.version}</td>
+                                  <td>${r.license}</td>
+                                  <td>${r.link !== "N/A" ? `<a href="${r.link}" target="_blank">View Details</a>` : "N/A"}</td>
+                              </tr>`).join('')}
+                      </table>
+                  `}
+              `;
+
               const htmlContent = `
                   <!DOCTYPE html>
                   <html>
@@ -144,23 +165,9 @@ jobs:
                   </head>
                   <body>
                       <h1>Dependency License Report</h1>
-                      <table>
-                          <tr>
-                              <th>Type</th>
-                              <th>Package</th>
-                              <th>Version</th>
-                              <th>License</th>
-                              <th>Details</th>
-                          </tr>
-                          ${results.map(r => `
-                              <tr class="${r.isCopyleft ? 'copyleft' : 'non-copyleft'}">
-                                  <td>${r.type}</td>
-                                  <td>${r.package}</td>
-                                  <td>${r.version}</td>
-                                  <td>${r.license}</td>
-                                  <td>${r.link !== "N/A" ? `<a href="${r.link}" target="_blank">View Details</a>` : "N/A"}</td>
-                              </tr>`).join('')}
-                      </table>
+                      ${createTable("Node.js Dependencies", nodeResults)}
+                      ${createTable("Python Dependencies", pythonResults)}
+                      ${createTable("Kotlin/Gradle Dependencies", kotlinResults)}
                   </body>
                   </html>
               `;
@@ -171,8 +178,7 @@ jobs:
               const nodeResults = await analyzeNodeDependencies();
               const pythonResults = await analyzePythonDependencies();
               const kotlinResults = await analyzeKotlinDependencies();
-              const allResults = [...nodeResults, ...pythonResults, ...kotlinResults];
-              await generateHtmlReport(allResults);
+              await generateHtmlReport(nodeResults, pythonResults, kotlinResults);
               console.log('HTML report generated as dependency-license-report.html');
           }
 
