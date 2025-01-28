@@ -15,173 +15,183 @@ jobs:
     steps:
       # Step 1: Checkout the repository
       - name: Checkout Repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      # Step 2: Set up Node.js
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
+      # Step 2: Set up Go Environment
+      - name: Setup Go
+        uses: actions/setup-go@v4
         with:
-          node-version: '18'
+          go-version: '1.20'
 
-      # Step 3: Set up Python
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.9'
-
-      # Step 4: Install Node.js Dependencies
-      - name: Install All Node.js Dependencies
+      # Step 3: Create Go License Checker
+      - name: Create and Build License Checker
         run: |
-          npm install --legacy-peer-deps
-          # Explicitly ensure axios is installed
-          npm install axios
+          mkdir -p license-checker
+          cat << 'EOF' > license-checker/main.go
+          package main
 
-      # Step 5: Create and Run License Check Script Inline
-      - name: Analyze Licenses
-        run: |
-          # Create the analyze-licenses.js script
-          cat << 'EOF' > analyze-licenses.js
-          const fs = require('fs');
-          const path = require('path');
-          const axios = require('axios');
+          import (
+              "encoding/json"
+              "fmt"
+              "html/template"
+              "io/ioutil"
+              "net/http"
+              "os"
+              "path/filepath"
+              "strings"
+              "sync"
+          )
 
-          // List of common copyleft licenses and variations
-          const copyleftLicenses = [
+          type Dependency struct {
+              Name        string
+              Version     string
+              License     string
+              Link        string
+              IsCopyleft  bool
+              DependencyType string
+          }
+
+          var copyleftLicenses = []string{
               "GPL", "LGPL", "AGPL", "MPL", "CC-BY-SA", "EPL",
               "GPL-2.0", "GPL-3.0", "LGPL-2.1", "LGPL-3.0", "AGPL-3.0",
               "MPL-1.1", "MPL-2.0", "CC-BY-SA-3.0", "CC-BY-SA-4.0",
-              "EPL-1.0", "EPL-2.0", "OFL", "CPL", "OSL", "APL"
-          ];
-
-          // Function to determine if a license is copyleft
-          function isCopyleftLicense(license) {
-              return copyleftLicenses.some(copyleft => license.toUpperCase().includes(copyleft));
+              "EPL-1.0", "EPL-2.0", "OFL", "CPL", "OSL", "APL",
           }
 
-          // Function to recursively search for requirements.txt
-          function findRequirementsFile(dir) {
-              const files = fs.readdirSync(dir, { withFileTypes: true });
-              for (const file of files) {
-                  const fullPath = path.join(dir, file.name);
-                  if (file.isFile() && file.name === 'requirements.txt') {
-                      return fullPath;
-                  }
-                  if (file.isDirectory()) {
-                      const found = findRequirementsFile(fullPath);
-                      if (found) return found;
+          func isCopyleftLicense(license string) bool {
+              for _, copyleft := range copyleftLicenses {
+                  if strings.Contains(strings.ToUpper(license), strings.ToUpper(copyleft)) {
+                      return true
                   }
               }
-              return null;
+              return false
           }
 
-          async function analyzeNpmDependencies() {
-              const results = [];
-              if (!fs.existsSync('package.json')) {
-                  console.log("No package.json found.");
-                  return { results, message: "No Node.js dependencies found." };
+          func fetchLicenseData(url string) (string, error) {
+              resp, err := http.Get(url)
+              if err != nil {
+                  return "Unknown", err
+              }
+              defer resp.Body.Close()
+
+              var data map[string]interface{}
+              if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+                  return "Unknown", err
               }
 
-              const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf-8'));
-              const dependencies = { ...packageJson.dependencies, ...packageJson.devDependencies };
-
-              if (!dependencies || Object.keys(dependencies).length === 0) {
-                  console.log("No dependencies found in package.json.");
-                  return { results, message: "No Node.js dependencies found." };
-              }
-
-              console.log(`Found ${Object.keys(dependencies).length} Node.js dependencies. Checking for licenses...`);
-              for (const [packageName, version] of Object.entries(dependencies)) {
-                  console.log(`\nAnalyzing ${packageName}@${version}...`);
-                  try {
-                      const response = await axios.get(`https://registry.npmjs.org/${packageName}`);
-                      const latestVersion = response.data['dist-tags']?.latest || version;
-                      const license = response.data.versions[latestVersion]?.license || "Unknown";
-                      const npmUrl = `https://www.npmjs.com/package/${packageName}`;
-                      const copyleft = isCopyleftLicense(license);
-
-                      results.push({
-                          packageName,
-                          version: latestVersion,
-                          license,
-                          detailsUrl: npmUrl,
-                          copyleft,
-                          type: "Node.js"
-                      });
-                  } catch (error) {
-                      console.error(`Error fetching details for ${packageName}:`, error.message);
+              license := "Unknown"
+              if info, exists := data["info"].(map[string]interface{}); exists {
+                  if lic, found := info["license"].(string); found && lic != "" {
+                      license = lic
+                  } else if classifiers, ok := info["classifiers"].([]interface{}); ok {
+                      for _, classifier := range classifiers {
+                          if str, ok := classifier.(string); ok && strings.HasPrefix(str, "License ::") {
+                              license = strings.TrimPrefix(str, "License :: ")
+                              break
+                          }
+                      }
                   }
               }
-
-              return { results, message: "" };
+              return license, nil
           }
 
-          async function generateHtmlReport() {
-              const npmAnalysis = await analyzeNpmDependencies();
+          func processPythonDependencies(filePath string, dependencies *[]Dependency, wg *sync.WaitGroup) {
+              defer wg.Done()
+              data, err := ioutil.ReadFile(filePath)
+              if err != nil {
+                  fmt.Println("Error reading requirements.txt:", err)
+                  return
+              }
 
-              const htmlContent = `
-                  <!DOCTYPE html>
-                  <html>
-                  <head>
-                      <title>Dependency License Report</title>
-                      <style>
-                          table {
-                              width: 100%;
-                              border-collapse: collapse;
-                          }
-                          th, td {
-                              border: 1px solid #ddd;
-                              padding: 8px;
-                              text-align: left;
-                          }
-                          th {
-                              background-color: #f2f2f2;
-                          }
-                          .copyleft {
-                              background-color: #f8d7da;
-                              color: #721c24;
-                          }
-                          .non-copyleft {
-                              background-color: #d4edda;
-                              color: #155724;
-                          }
-                      </style>
-                  </head>
-                  <body>
-                      <h1>Dependency License Report</h1>
-
-                      <h2>Node.js Dependencies</h2>
-                      ${npmAnalysis.message ? `<p>${npmAnalysis.message}</p>` : ""}
-                      <table>
-                          <tr>
-                              <th>Package</th>
-                              <th>Version</th>
-                              <th>License</th>
-                              <th>Details</th>
-                          </tr>
-                          ${npmAnalysis.results.map(result => `
-                              <tr class="${result.copyleft ? 'copyleft' : 'non-copyleft'}">
-                                  <td>${result.packageName}</td>
-                                  <td>${result.version}</td>
-                                  <td>${result.license}</td>
-                                  <td><a href="${result.detailsUrl}" target="_blank">View Details</a></td>
-                              </tr>
-                          `).join('')}
-                      </table>
-                  </body>
-                  </html>
-              `;
-
-              fs.writeFileSync('dependency-license-report.html', htmlContent);
-              console.log('Report generated: dependency-license-report.html');
+              lines := strings.Split(string(data), "\n")
+              for _, line := range lines {
+                  if strings.TrimSpace(line) == "" || strings.HasPrefix(line, "#") {
+                      continue
+                  }
+                  parts := strings.Split(line, "==")
+                  name := parts[0]
+                  version := "Latest"
+                  if len(parts) > 1 {
+                      version = parts[1]
+                  }
+                  license, _ := fetchLicenseData(fmt.Sprintf("https://pypi.org/pypi/%s/json", name))
+                  *dependencies = append(*dependencies, Dependency{
+                      Name:          name,
+                      Version:       version,
+                      License:       license,
+                      Link:          fmt.Sprintf("https://pypi.org/project/%s", name),
+                      IsCopyleft:    isCopyleftLicense(license),
+                      DependencyType: "Python",
+                  })
+              }
           }
 
-          generateHtmlReport();
+          func generateHTMLReport(dependencies []Dependency, outputPath string) {
+              tmpl := `
+              <!DOCTYPE html>
+              <html>
+              <head>
+                  <title>Dependency License Report</title>
+                  <style>
+                      table { width: 100%; border-collapse: collapse; }
+                      th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                      th { background-color: #f2f2f2; }
+                      .copyleft { background-color: #f8d7da; color: #721c24; }
+                      .non-copyleft { background-color: #d4edda; color: #155724; }
+                  </style>
+              </head>
+              <body>
+                  <h1>Dependency License Report</h1>
+                  <table>
+                      <tr>
+                          <th>Package</th>
+                          <th>Version</th>
+                          <th>License</th>
+                          <th>Link</th>
+                          <th>Type</th>
+                      </tr>
+                      {{ range . }}
+                      <tr class="{{if .IsCopyleft}}copyleft{{else}}non-copyleft{{end}}">
+                          <td>{{.Name}}</td>
+                          <td>{{.Version}}</td>
+                          <td>{{.License}}</td>
+                          <td><a href="{{.Link}}" target="_blank">Details</a></td>
+                          <td>{{.DependencyType}}</td>
+                      </tr>
+                      {{ end }}
+                  </table>
+              </body>
+              </html>
+              `
+              f, _ := os.Create(outputPath)
+              defer f.Close()
+
+              t := template.Must(template.New("report").Parse(tmpl))
+              t.Execute(f, dependencies)
+          }
+
+          func main() {
+              var dependencies []Dependency
+              var wg sync.WaitGroup
+
+              wg.Add(1)
+              go processPythonDependencies("requirements.txt", &dependencies, &wg)
+
+              wg.Wait()
+              generateHTMLReport(dependencies, "dependency-license-report.html")
+          }
           EOF
 
-          # Run the script
-          node analyze-licenses.js
+          cd license-checker
+          go mod init license-checker
+          go build -o license-checker .
+          cd ..
 
-      # Step 6: Upload HTML Report as an Artifact
+      # Step 4: Run License Checker
+      - name: Run License Checker
+        run: ./license-checker/license-checker
+
+      # Step 5: Upload HTML Report
       - name: Upload License Report
         uses: actions/upload-artifact@v4
         with:
