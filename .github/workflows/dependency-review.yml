@@ -23,7 +23,20 @@ jobs:
         with:
           node-version: '18'
 
-      # Step 3: Analyze Licenses
+      # Step 3: Set up Python
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      # Step 4: Install Node.js Dependencies
+      - name: Install All Node.js Dependencies
+        run: |
+          npm install --legacy-peer-deps
+          # Explicitly ensure axios is installed
+          npm install axios
+
+      # Step 5: Create and Run License Check Script Inline
       - name: Analyze Licenses
         run: |
           # Create the analyze-licenses.js script
@@ -32,6 +45,7 @@ jobs:
           const path = require('path');
           const axios = require('axios');
 
+          // List of common copyleft licenses and variations
           const copyleftLicenses = [
               "GPL", "LGPL", "AGPL", "MPL", "CC-BY-SA", "EPL",
               "GPL-2.0", "GPL-3.0", "LGPL-2.1", "LGPL-3.0", "AGPL-3.0",
@@ -39,116 +53,135 @@ jobs:
               "EPL-1.0", "EPL-2.0", "OFL", "CPL", "OSL", "APL"
           ];
 
+          // Function to determine if a license is copyleft
           function isCopyleftLicense(license) {
               return copyleftLicenses.some(copyleft => license.toUpperCase().includes(copyleft));
           }
 
-          function findFile(dir, targetFile) {
+          // Function to recursively search for requirements.txt
+          function findRequirementsFile(dir) {
               const files = fs.readdirSync(dir, { withFileTypes: true });
               for (const file of files) {
                   const fullPath = path.join(dir, file.name);
-                  if (file.isFile() && file.name === targetFile) return fullPath;
+                  if (file.isFile() && file.name === 'requirements.txt') {
+                      return fullPath;
+                  }
                   if (file.isDirectory()) {
-                      const found = findFile(fullPath, targetFile);
+                      const found = findRequirementsFile(fullPath);
                       if (found) return found;
                   }
               }
               return null;
           }
 
-          async function fetchKotlinLicenseFromSonatype(group, artifact, version) {
-              try {
-                  const searchUrl = `https://central.sonatype.com/artifact/${group}/${artifact}/${version}`;
-                  const response = await axios.get(searchUrl);
-                  const htmlContent = response.data;
-                  const licenseMatch = htmlContent.match(/<span class="license-name">([^<]+)<\/span>/);
-
-                  if (licenseMatch && licenseMatch[1]) {
-                      return licenseMatch[1].trim();
-                  } else {
-                      return "Unknown";
-                  }
-              } catch (error) {
-                  console.error(`Error fetching license for ${group}:${artifact}:${version}:`, error.message);
-                  return "Unknown";
-              }
-          }
-
-          async function analyzeKotlinDependencies() {
+          async function analyzeNpmDependencies() {
               const results = [];
-              const tomlFile = findFile('.', 'libs.versions.toml');
-              if (tomlFile) {
-                  const tomlContent = fs.readFileSync(tomlFile, 'utf-8');
-                  const matches = tomlContent.matchAll(/(?<group>[\w.]+):(?<artifact>[\w-]+)\s*=\s*["'](?<version>[^"']+)["']/g);
-                  for (const match of matches) {
-                      const { group, artifact, version } = match.groups;
-                      const license = await fetchKotlinLicenseFromSonatype(group, artifact, version);
-                      const sonatypeUrl = `https://central.sonatype.com/artifact/${group}/${artifact}/${version}`;
+              if (!fs.existsSync('package.json')) {
+                  console.log("No package.json found.");
+                  return { results, message: "No Node.js dependencies found." };
+              }
+
+              const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf-8'));
+              const dependencies = { ...packageJson.dependencies, ...packageJson.devDependencies };
+
+              if (!dependencies || Object.keys(dependencies).length === 0) {
+                  console.log("No dependencies found in package.json.");
+                  return { results, message: "No Node.js dependencies found." };
+              }
+
+              console.log(`Found ${Object.keys(dependencies).length} Node.js dependencies. Checking for licenses...`);
+              for (const [packageName, version] of Object.entries(dependencies)) {
+                  console.log(`\nAnalyzing ${packageName}@${version}...`);
+                  try {
+                      const response = await axios.get(`https://registry.npmjs.org/${packageName}`);
+                      const latestVersion = response.data['dist-tags']?.latest || version;
+                      const license = response.data.versions[latestVersion]?.license || "Unknown";
+                      const npmUrl = `https://www.npmjs.com/package/${packageName}`;
+                      const copyleft = isCopyleftLicense(license);
+
                       results.push({
-                          group,
-                          artifact,
-                          version,
+                          packageName,
+                          version: latestVersion,
                           license,
-                          detailsUrl: sonatypeUrl,
-                          copyleft: isCopyleftLicense(license)
+                          detailsUrl: npmUrl,
+                          copyleft,
+                          type: "Node.js"
                       });
+                  } catch (error) {
+                      console.error(`Error fetching details for ${packageName}:`, error.message);
                   }
               }
-              return results;
+
+              return { results, message: "" };
           }
 
-          async function generateHtmlReport(kotlinResults) {
+          async function generateHtmlReport() {
+              const npmAnalysis = await analyzeNpmDependencies();
+
               const htmlContent = `
                   <!DOCTYPE html>
                   <html>
                   <head>
-                      <title>Kotlin Dependency License Report</title>
+                      <title>Dependency License Report</title>
                       <style>
-                          table { width: 100%; border-collapse: collapse; }
-                          th, td { border: 1px solid #ddd; padding: 8px; }
-                          th { background-color: #f2f2f2; }
-                          .copyleft { background-color: #f8d7da; color: #721c24; }
-                          .non-copyleft { background-color: #d4edda; color: #155724; }
+                          table {
+                              width: 100%;
+                              border-collapse: collapse;
+                          }
+                          th, td {
+                              border: 1px solid #ddd;
+                              padding: 8px;
+                              text-align: left;
+                          }
+                          th {
+                              background-color: #f2f2f2;
+                          }
+                          .copyleft {
+                              background-color: #f8d7da;
+                              color: #721c24;
+                          }
+                          .non-copyleft {
+                              background-color: #d4edda;
+                              color: #155724;
+                          }
                       </style>
                   </head>
                   <body>
-                      <h1>Kotlin Dependency License Report</h1>
+                      <h1>Dependency License Report</h1>
+
+                      <h2>Node.js Dependencies</h2>
+                      ${npmAnalysis.message ? `<p>${npmAnalysis.message}</p>` : ""}
                       <table>
                           <tr>
-                              <th>Group</th>
-                              <th>Artifact</th>
+                              <th>Package</th>
                               <th>Version</th>
                               <th>License</th>
                               <th>Details</th>
                           </tr>
-                          ${kotlinResults.map(r => `
-                              <tr class="${r.copyleft ? 'copyleft' : 'non-copyleft'}">
-                                  <td>${r.group}</td>
-                                  <td>${r.artifact}</td>
-                                  <td>${r.version}</td>
-                                  <td>${r.license}</td>
-                                  <td><a href="${r.detailsUrl}" target="_blank">Details</a></td>
-                              </tr>`).join('')}
+                          ${npmAnalysis.results.map(result => `
+                              <tr class="${result.copyleft ? 'copyleft' : 'non-copyleft'}">
+                                  <td>${result.packageName}</td>
+                                  <td>${result.version}</td>
+                                  <td>${result.license}</td>
+                                  <td><a href="${result.detailsUrl}" target="_blank">View Details</a></td>
+                              </tr>
+                          `).join('')}
                       </table>
                   </body>
                   </html>
               `;
+
               fs.writeFileSync('dependency-license-report.html', htmlContent);
+              console.log('Report generated: dependency-license-report.html');
           }
 
-          async function main() {
-              const kotlinResults = await analyzeKotlinDependencies();
-              await generateHtmlReport(kotlinResults);
-              console.log('HTML report generated: dependency-license-report.html');
-          }
-
-          main().catch(err => console.error(err));
+          generateHtmlReport();
           EOF
 
           # Run the script
           node analyze-licenses.js
 
-      # Step 4: Upload HTML Report
+      # Step 6: Upload HTML Report as an Artifact
       - name: Upload License Report
         uses: actions/upload-artifact@v4
         with:
