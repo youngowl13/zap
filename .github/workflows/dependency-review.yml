@@ -243,8 +243,7 @@ jobs:
                   if strings.Contains(line, "=") {
                       parts := strings.Split(line, "=")
                       pkg := strings.TrimSpace(parts[0])
-                      groupArtifact := strings.ReplaceAll(pkg, ".", "/")
-                      license, details := fetchKotlinLicense(groupArtifact)
+                      license, details := fetchKotlinLicense(pkg)
                       result = append(result, Dependency{
                           Name:     pkg,
                           License:  license,
@@ -256,9 +255,25 @@ jobs:
               return result
           }
 
-          func fetchKotlinLicense(groupArtifact string) (string, string) {
-              url := fmt.Sprintf("https://central.sonatype.com/artifact/%s", groupArtifact)
-              return "Unknown", url
+          func fetchKotlinLicense(pkg string) (string, string) {
+              // First try Approach 1: OSS Index API
+              ossIndexURL := fmt.Sprintf("https://ossindex.sonatype.org/api/v3/component-report/%s", pkg)
+              resp, err := http.Get(ossIndexURL)
+              if err == nil && resp.StatusCode == http.StatusOK {
+                  var ossData []map[string]interface{}
+                  json.NewDecoder(resp.Body).Decode(&ossData)
+                  if len(ossData) > 0 {
+                      license, ok := ossData[0]["license"].(string)
+                      if ok {
+                          return license, ossIndexURL
+                      }
+                  }
+              }
+              defer resp.Body.Close()
+
+              // Fallback to Approach 2: Central Maven Repository
+              mavenURL := fmt.Sprintf("https://central.sonatype.com/artifact/%s", pkg)
+              return "Unknown", mavenURL
           }
 
           func generateHTMLReport(nodeDeps, pythonDeps, kotlinDeps []Dependency) {
