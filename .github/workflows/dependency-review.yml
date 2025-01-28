@@ -41,7 +41,6 @@ jobs:
               "strings"
           )
 
-          // List of copyleft licenses
           var copyleftLicenses = []string{
               "GPL", "LGPL", "AGPL", "MPL", "CC-BY-SA", "EPL",
               "GPL-2.0", "GPL-3.0", "LGPL-2.1", "LGPL-3.0", "AGPL-3.0",
@@ -183,10 +182,10 @@ jobs:
               fmt.Println("Dependency license report generated!")
           }
           EOF
-          cd license-checker
+          cd ..
           go mod init license-checker
           go mod tidy
-          go build -o license-checker
+          go build -o license-checker ./license-checker
 
       # Step 4: Run License Checker
       - name: Run License Checker
@@ -198,4 +197,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: dependency-license-report
-          path: license-checker/dependency-license-report.html
+          path: ./dependency-license-report.html
