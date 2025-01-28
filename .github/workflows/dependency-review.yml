@@ -183,9 +183,7 @@ jobs:
           }
           EOF
           cd ..
-          go mod init license-checker
-          go mod tidy
-          go build -o license-checker ./license-checker
+          go build -o license-checker ./license-checker/main.go
 
       # Step 4: Run License Checker
       - name: Run License Checker
