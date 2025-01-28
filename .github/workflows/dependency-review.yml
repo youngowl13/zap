@@ -13,15 +13,15 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Step 1: Checkout the repository
+      # Step 1: Checkout the Repository
       - name: Checkout Repository
         uses: actions/checkout@v3
 
-      # Step 2: Set up Go
+      # Step 2: Setup Go
       - name: Setup Go
         uses: actions/setup-go@v4
         with:
-          go-version: '1.20'
+          go-version: "1.19"
 
       # Step 3: Create and Build License Checker
       - name: Create and Build License Checker
@@ -34,6 +34,7 @@ jobs:
           import (
               "encoding/json"
               "fmt"
+              "html/template"
               "io/ioutil"
               "net/http"
               "os"
@@ -41,158 +42,177 @@ jobs:
               "strings"
           )
 
-          var copyleftLicenses = []string{
-              "GPL", "LGPL", "AGPL", "MPL", "CC-BY-SA", "EPL",
-              "GPL-2.0", "GPL-3.0", "LGPL-2.1", "LGPL-3.0", "AGPL-3.0",
-              "MPL-1.1", "MPL-2.0", "CC-BY-SA-3.0", "CC-BY-SA-4.0",
-              "EPL-1.0", "EPL-2.0", "OFL", "CPL", "OSL", "APL",
+          type Dependency struct {
+              Package  string
+              Version  string
+              License  string
+              Details  string
           }
 
-          func isCopyleftLicense(license string) bool {
-              for _, l := range copyleftLicenses {
-                  if strings.Contains(strings.ToUpper(license), l) {
-                      return true
-                  }
-              }
-              return false
+          type Report struct {
+              NodeDependencies    []Dependency
+              PythonDependencies  []Dependency
+              KotlinDependencies  []Dependency
           }
 
-          func findFiles(dir string, targetFiles []string) []string {
-              var foundFiles []string
-              _ = filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
-                  if err != nil {
-                      return nil
-                  }
-                  for _, target := range targetFiles {
-                      if strings.HasSuffix(info.Name(), target) {
-                          foundFiles = append(foundFiles, path)
-                      }
+          func findFile(root, filename string) string {
+              var result string
+              filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+                  if err == nil && strings.Contains(info.Name(), filename) {
+                      result = path
+                      return filepath.SkipDir
                   }
                   return nil
               })
-              return foundFiles
+              return result
           }
 
-          func fetchLicenseInfo(packageName, source string) (string, string) {
-              var url string
-              if source == "npm" {
-                  url = fmt.Sprintf("https://registry.npmjs.org/%s", packageName)
-              } else if source == "pypi" {
-                  url = fmt.Sprintf("https://pypi.org/pypi/%s/json", packageName)
-              } else if source == "maven" {
-                  url = fmt.Sprintf("https://central.sonatype.com/api/components?q=%s", packageName)
+          func fetchLicense(packageName, version, packageType string) string {
+              var apiURL string
+              if packageType == "node" {
+                  apiURL = fmt.Sprintf("https://registry.npmjs.org/%s", packageName)
+              } else if packageType == "python" {
+                  apiURL = fmt.Sprintf("https://pypi.org/pypi/%s/json", packageName)
+              } else if packageType == "kotlin" {
+                  apiURL = fmt.Sprintf("https://central.sonatype.com/artifact/%s/%s", packageName, version)
               }
 
-              resp, err := http.Get(url)
-              if err != nil || resp.StatusCode != http.StatusOK {
-                  return "Unknown", "N/A"
+              resp, err := http.Get(apiURL)
+              if err != nil {
+                  return "Unknown"
               }
               defer resp.Body.Close()
 
+              var result map[string]interface{}
               body, _ := ioutil.ReadAll(resp.Body)
-              if source == "npm" {
-                  var npmData map[string]interface{}
-                  _ = json.Unmarshal(body, &npmData)
-                  versionData := npmData["versions"].(map[string]interface{})
-                  for _, v := range versionData {
-                      license := v.(map[string]interface{})["license"]
-                      if license != nil {
-                          return fmt.Sprintf("%v", license), fmt.Sprintf("https://www.npmjs.com/package/%s", packageName)
-                      }
+              json.Unmarshal(body, &result)
+
+              if packageType == "node" && result["license"] != nil {
+                  return result["license"].(string)
+              } else if packageType == "python" && result["info"] != nil {
+                  return result["info"].(map[string]interface{})["license"].(string)
+              }
+
+              return "Unknown"
+          }
+
+          func parseDependencies(filePath, packageType string) []Dependency {
+              content, err := ioutil.ReadFile(filePath)
+              if err != nil {
+                  return nil
+              }
+
+              var dependencies []Dependency
+              if packageType == "node" {
+                  var pkgJSON map[string]interface{}
+                  json.Unmarshal(content, &pkgJSON)
+
+                  deps := pkgJSON["dependencies"].(map[string]interface{})
+                  for name, version := range deps {
+                      license := fetchLicense(name, version.(string), "node")
+                      dependencies = append(dependencies, Dependency{
+                          Package:  name,
+                          Version:  version.(string),
+                          License:  license,
+                          Details:  fmt.Sprintf("https://www.npmjs.com/package/%s", name),
+                      })
                   }
-              } else if source == "pypi" {
-                  var pypiData map[string]interface{}
-                  _ = json.Unmarshal(body, &pypiData)
-                  info := pypiData["info"].(map[string]interface{})
-                  license := info["license"]
-                  projectURL := info["project_url"]
-                  if license != nil && projectURL != nil {
-                      return fmt.Sprintf("%v", license), fmt.Sprintf("%v", projectURL)
-                  }
-              } else if source == "maven" {
-                  var mavenData map[string]interface{}
-                  _ = json.Unmarshal(body, &mavenData)
-                  components := mavenData["items"].([]interface{})
-                  for _, item := range components {
-                      license := item.(map[string]interface{})["license"]
-                      url := item.(map[string]interface{})["url"]
-                      if license != nil && url != nil {
-                          return fmt.Sprintf("%v", license), fmt.Sprintf("%v", url)
+              } else if packageType == "python" {
+                  lines := strings.Split(string(content), "\n")
+                  for _, line := range lines {
+                      if line == "" {
+                          continue
                       }
+                      parts := strings.Split(line, "==")
+                      name := parts[0]
+                      version := "Latest"
+                      if len(parts) > 1 {
+                          version = parts[1]
+                      }
+                      license := fetchLicense(name, version, "python")
+                      dependencies = append(dependencies, Dependency{
+                          Package:  name,
+                          Version:  version,
+                          License:  license,
+                          Details:  fmt.Sprintf("https://pypi.org/project/%s", name),
+                      })
                   }
               }
-              return "Unknown", "N/A"
+              return dependencies
+          }
+
+          func generateHTMLReport(report Report) {
+              tmpl := `
+              <!DOCTYPE html>
+              <html>
+              <head>
+                  <title>Dependency License Report</title>
+                  <style>
+                      table { width: 100%; border-collapse: collapse; }
+                      th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                      th { background-color: #f2f2f2; }
+                      .unknown { background-color: #fdd; }
+                  </style>
+              </head>
+              <body>
+                  <h1>Dependency License Report</h1>
+                  {{range $section, $deps := .}}
+                      <h2>{{$section}}</h2>
+                      <table>
+                          <tr>
+                              <th>Package</th>
+                              <th>Version</th>
+                              <th>License</th>
+                              <th>Details</th>
+                          </tr>
+                          {{range $deps}}
+                              <tr class="{{if eq .License "Unknown"}}unknown{{end}}">
+                                  <td>{{.Package}}</td>
+                                  <td>{{.Version}}</td>
+                                  <td>{{.License}}</td>
+                                  <td><a href="{{.Details}}" target="_blank">Details</a></td>
+                              </tr>
+                          {{end}}
+                      </table>
+                  {{end}}
+              </body>
+              </html>
+              `
+
+              t := template.Must(template.New("report").Parse(tmpl))
+              f, _ := os.Create("dependency-license-report.html")
+              defer f.Close()
+              t.Execute(f, report)
           }
 
           func main() {
-              var htmlReport strings.Builder
-              htmlReport.WriteString("<html><head><title>Dependency License Report</title></head><body>")
-              htmlReport.WriteString("<h1>Dependency License Report</h1>")
+              nodeFile := findFile(".", "package.json")
+              pythonFile := findFile(".", "requirements.txt")
+              kotlinFile := findFile(".", "libs.versions.toml")
 
-              dependencies := map[string][]string{
-                  "Node.js": {"package.json"},
-                  "Python":  {"requirements.txt", "requirement.txt"},
-                  "Kotlin":  {"libs.versions.toml"},
+              nodeDeps := parseDependencies(nodeFile, "node")
+              pythonDeps := parseDependencies(pythonFile, "python")
+              // Add logic for Kotlin dependencies if necessary
+
+              report := Report{
+                  NodeDependencies:    nodeDeps,
+                  PythonDependencies:  pythonDeps,
+                  KotlinDependencies:  nil, // Add Kotlin logic
               }
-
-              for depType, files := range dependencies {
-                  htmlReport.WriteString(fmt.Sprintf("<h2>%s Dependencies</h2>", depType))
-                  foundFiles := findFiles(".", files)
-                  if len(foundFiles) == 0 {
-                      htmlReport.WriteString("<p>No dependencies found.</p>")
-                      continue
-                  }
-
-                  htmlReport.WriteString("<table border='1'><tr><th>Package</th><th>License</th><th>Details</th></tr>")
-                  for _, file := range foundFiles {
-                      content, _ := ioutil.ReadFile(file)
-                      lines := strings.Split(string(content), "\n")
-                      for _, line := range lines {
-                          packageName := strings.TrimSpace(strings.Split(line, " ")[0])
-                          if packageName == "" {
-                              continue
-                          }
-
-                          source := ""
-                          if depType == "Node.js" {
-                              source = "npm"
-                          } else if depType == "Python" {
-                              source = "pypi"
-                          } else if depType == "Kotlin" {
-                              source = "maven"
-                          }
-
-                          license, url := fetchLicenseInfo(packageName, source)
-                          color := "#d4edda"
-                          if isCopyleftLicense(license) {
-                              color = "#f8d7da"
-                          }
-
-                          htmlReport.WriteString(fmt.Sprintf(
-                              "<tr style='background-color:%s'><td>%s</td><td>%s</td><td><a href='%s'>Details</a></td></tr>",
-                              color, packageName, license, url,
-                          ))
-                      }
-                  }
-                  htmlReport.WriteString("</table>")
-              }
-
-              htmlReport.WriteString("</body></html>")
-              _ = ioutil.WriteFile("dependency-license-report.html", []byte(htmlReport.String()), 0644)
-              fmt.Println("Dependency license report generated!")
+              generateHTMLReport(report)
           }
           EOF
-          cd ..
-          go build -o checker ./license-checker/main.go
+          go mod init license-checker
+          go mod tidy
+          go build -o ../checker .
 
       # Step 4: Run License Checker
       - name: Run License Checker
-        run: |
-          ./checker
+        run: ./checker
 
-      # Step 5: Upload License Report
+      # Step 5: Upload HTML Report
       - name: Upload License Report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: dependency-license-report
-          path: ./dependency-license-report.html
+          path: dependency-license-report.html
