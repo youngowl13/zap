@@ -55,6 +55,21 @@ jobs:
               );
           }
 
+          function findFileRecursive(dir, filenames) {
+              const files = fs.readdirSync(dir, { withFileTypes: true });
+              for (const file of files) {
+                  const fullPath = path.join(dir, file.name);
+                  if (file.isFile() && filenames.includes(file.name)) {
+                      return fullPath;
+                  }
+                  if (file.isDirectory()) {
+                      const found = findFileRecursive(fullPath, filenames);
+                      if (found) return found;
+                  }
+              }
+              return null;
+          }
+
           async function fetchKotlinLicense(group, artifact, version) {
               try {
                   const url = `https://repo1.maven.org/maven2/${group.replace(
@@ -67,30 +82,6 @@ jobs:
               } catch {
                   return "Unknown";
               }
-          }
-
-          function generateTableHeading(heading) {
-              return `<h2>${heading}</h2>`;
-          }
-
-          function generateTable(results, headings) {
-              if (results.length === 0) {
-                  return `<p>No dependencies found.</p>`;
-              }
-
-              const tableHead = `<tr>${headings.map((h) => `<th>${h}</th>`).join("")}</tr>`;
-              const tableBody = results
-                  .map(
-                      (r) =>
-                          `<tr class="${
-                              r.copyleft ? "copyleft" : "non-copyleft"
-                          }"><td>${r.packageName || r.group}:${r.artifact}</td><td>${
-                              r.version
-                          }</td><td>${r.license}</td><td>${r.detailsUrl ? `<a href="${r.detailsUrl}" target="_blank">Details</a>` : "N/A"}</td></tr>`
-                  )
-                  .join("");
-
-              return `<table>${tableHead}${tableBody}</table>`;
           }
 
           async function analyzeNodeDependencies() {
@@ -125,9 +116,9 @@ jobs:
 
           async function analyzePythonDependencies() {
               const results = [];
-              const requirementsFile = "requirements.txt";
+              const requirementsFile = findFileRecursive(".", ["requirements.txt", "requirement.txt"]);
 
-              if (!fs.existsSync(requirementsFile)) {
+              if (!requirementsFile) {
                   return { results, message: "No Python dependencies found." };
               }
 
@@ -158,15 +149,15 @@ jobs:
 
           async function analyzeKotlinDependencies() {
               const results = [];
-              const tomlFile = "libs.versions.toml";
+              const tomlFile = findFileRecursive(".", ["libs.versions.toml"]);
 
-              if (!fs.existsSync(tomlFile)) {
+              if (!tomlFile) {
                   return { results, message: "No Kotlin/Gradle dependencies found." };
               }
 
               const content = fs.readFileSync(tomlFile, "utf-8");
               const matches = content.matchAll(
-                  /(?<group>[\w\.]+)\s*=\s*["'](?<artifact>[\w\-]+):(?<version>[\w\.\-]+)["']/g
+                  /(?<group>[\w\.]+):(?<artifact>[\w\-]+):(?<version>[\w\.\-]+)/g
               );
 
               for (const match of matches) {
@@ -200,12 +191,49 @@ jobs:
               </head>
               <body>
                   <h1>Dependency License Report</h1>
-                  ${generateTableHeading("Node.js Dependencies")}
-                  ${generateTable(nodeResults.results, ["Package", "Version", "License", "Details"])}
-                  ${generateTableHeading("Python Dependencies")}
-                  ${generateTable(pythonResults.results, ["Package", "Version", "License", "Details"])}
-                  ${generateTableHeading("Kotlin/Gradle Dependencies")}
-                  ${generateTable(kotlinResults.results, ["Dependency", "Version", "License", "Details"])}
+                  <h2>Node.js Dependencies</h2>
+                  ${nodeResults.results.length === 0 ? "<p>No dependencies found.</p>" : ""}
+                  <table>
+                      <tr><th>Package</th><th>Version</th><th>License</th><th>Details</th></tr>
+                      ${nodeResults.results
+                          .map(
+                              (r) =>
+                                  `<tr class="${r.copyleft ? "copyleft" : "non-copyleft"}"><td>${
+                                      r.packageName
+                                  }</td><td>${r.version}</td><td>${r.license}</td><td><a href="${
+                                      r.detailsUrl
+                                  }" target="_blank">Details</a></td></tr>`
+                          )
+                          .join("")}
+                  </table>
+                  <h2>Python Dependencies</h2>
+                  ${pythonResults.results.length === 0 ? "<p>No dependencies found.</p>" : ""}
+                  <table>
+                      <tr><th>Package</th><th>Version</th><th>License</th><th>Details</th></tr>
+                      ${pythonResults.results
+                          .map(
+                              (r) =>
+                                  `<tr class="${r.copyleft ? "copyleft" : "non-copyleft"}"><td>${
+                                      r.packageName
+                                  }</td><td>${r.version}</td><td>${r.license}</td><td><a href="${
+                                      r.detailsUrl
+                                  }" target="_blank">Details</a></td></tr>`
+                          )
+                          .join("")}
+                  </table>
+                  <h2>Kotlin/Gradle Dependencies</h2>
+                  ${kotlinResults.results.length === 0 ? "<p>No dependencies found.</p>" : ""}
+                  <table>
+                      <tr><th>Group</th><th>Artifact</th><th>Version</th><th>License</th></tr>
+                      ${kotlinResults.results
+                          .map(
+                              (r) =>
+                                  `<tr class="${r.copyleft ? "copyleft" : "non-copyleft"}"><td>${
+                                      r.group
+                                  }</td><td>${r.artifact}</td><td>${r.version}</td><td>${r.license}</td></tr>`
+                          )
+                          .join("")}
+                  </table>
               </body>
               </html>
               `;
