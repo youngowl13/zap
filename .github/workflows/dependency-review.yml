@@ -29,15 +29,23 @@ jobs:
         with:
           python-version: '3.9'
 
-      # Step 4: Install Node.js Dependencies
+      # Step 4: Check Node.js and NPM Versions
+      - name: Debug Node.js and NPM Setup
+        run: |
+          node -v
+          npm -v
+
+      # Step 5: Install Node.js Dependencies
+      # Install project dependencies from package.json
       - name: Install Node.js Dependencies
         run: npm install --legacy-peer-deps
 
-      # Step 5: Install Additional Node.js Dependencies
+      # Step 6: Install Additional Node.js Dependencies
+      # Install additional dependencies (cheerio, axios) required for the script
       - name: Install Additional Node.js Dependencies
-        run: npm install cheerio axios
+        run: npm install cheerio axios --force
 
-      # Step 6: Create and Run License Check Script Inline
+      # Step 7: Create and Run License Analysis Script
       - name: Analyze Licenses
         run: |
           # Create the analyze-licenses.js script
@@ -47,7 +55,6 @@ jobs:
           const axios = require('axios');
           const cheerio = require('cheerio');
 
-          // List of common copyleft licenses and variations
           const copyleftLicenses = [
               "GPL", "LGPL", "AGPL", "MPL", "CC-BY-SA", "EPL",
               "GPL-2.0", "GPL-3.0", "LGPL-2.1", "LGPL-3.0", "AGPL-3.0",
@@ -55,12 +62,10 @@ jobs:
               "EPL-1.0", "EPL-2.0", "OFL", "CPL", "OSL", "APL"
           ];
 
-          // Function to determine if a license is copyleft
           function isCopyleftLicense(license) {
               return copyleftLicenses.some(copyleft => license.toUpperCase().includes(copyleft));
           }
 
-          // Function to recursively search for a specific file
           function findFileRecursively(dir, fileName) {
               const files = fs.readdirSync(dir, { withFileTypes: true });
               for (const file of files) {
@@ -76,7 +81,6 @@ jobs:
               return null;
           }
 
-          // Function to parse libs.versions.toml
           function parseToml(filePath) {
               const toml = fs.readFileSync(filePath, 'utf-8');
               const sections = {};
@@ -89,31 +93,11 @@ jobs:
                       sections[currentSection] = {};
                   } else if (line && currentSection) {
                       const [key, value] = line.split('=').map(part => part.trim());
-                      sections[currentSection][key] = value.replace(/"|'/g, ''); // Remove quotes
+                      sections[currentSection][key] = value.replace(/"|'/g, '');
                   }
               });
 
               return sections;
-          }
-
-          // Function to fetch license from PyPI page
-          async function fetchLicenseFromPyPIPage(packageName) {
-              try {
-                  const response = await axios.get(`https://pypi.org/project/${packageName}`);
-                  const $ = cheerio.load(response.data);
-                  const license = $('meta:contains("License")')
-                      .parent()
-                      .text()
-                      .trim()
-                      .split('\n')
-                      .find(line => line.includes("License"))
-                      ?.replace("License", "")
-                      ?.trim();
-                  return license || "Unknown";
-              } catch (error) {
-                  console.error(`Error fetching license from PyPI page for ${packageName}:`, error.message);
-                  return "Unknown";
-              }
           }
 
           async function analyzePythonDependencies() {
@@ -121,7 +105,7 @@ jobs:
               const requirementsFile = findFileRecursively('.', 'requirements.txt') || findFileRecursively('.', 'requirement.txt');
 
               if (!requirementsFile) {
-                  console.log("No requirements.txt or requirement.txt found.");
+                  console.log("No Python dependencies found.");
                   return { results, message: "No Python dependencies found." };
               }
 
@@ -130,89 +114,22 @@ jobs:
 
               for (const dependency of dependencies) {
                   const packageName = dependency.split('==')[0];
-                  console.log(`\nAnalyzing ${packageName}...`);
                   try {
                       const response = await axios.get(`https://pypi.org/pypi/${packageName}/json`);
                       const info = response.data.info;
-                      let license = info.license || "Unknown";
-                      const pypiUrl = info.project_url || `https://pypi.org/project/${packageName}`;
-
-                      // Fallback to scrape PyPI page if license is "Unknown"
-                      if (license === "Unknown") {
-                          console.log(`License for ${packageName} is unknown, fetching from PyPI page...`);
-                          license = await fetchLicenseFromPyPIPage(packageName);
-                      }
+                      const license = info.license || "Unknown";
+                      const detailsUrl = info.project_url || `https://pypi.org/project/${packageName}`;
 
                       const copyleft = isCopyleftLicense(license);
-
-                      results.push({
-                          packageName,
-                          version: dependency.split('==')[1] || "Latest",
-                          license,
-                          detailsUrl: pypiUrl,
-                          copyleft,
-                          type: "Python"
-                      });
+                      results.push({ packageName, license, detailsUrl, copyleft });
                   } catch (error) {
-                      console.error(`Error fetching details for ${packageName}:`, error.message);
+                      console.error(`Error fetching details for ${packageName}: ${error.message}`);
                   }
               }
-
-              return { results, message: "" };
-          }
-
-          async function analyzeGradleDependencies() {
-              const results = [];
-              const tomlFile = findFileRecursively('.', 'libs.versions.toml'); // Search recursively for libs.versions.toml
-
-              if (!tomlFile) {
-                  console.log("No libs.versions.toml file found.");
-                  return { results, message: "No Gradle dependencies found." };
-              }
-
-              console.log(`Found libs.versions.toml at ${tomlFile}.`);
-              const sections = parseToml(tomlFile);
-              const versions = sections.versions || {};
-              const libraries = sections.libraries || {};
-
-              for (const [key, lib] of Object.entries(libraries)) {
-                  const group = lib.match(/group\s*=\s*"([^"]+)"/)?.[1];
-                  const name = lib.match(/name\s*=\s*"([^"]+)"/)?.[1];
-                  const versionRef = lib.match(/version\.ref\s*=\s*"([^"]+)"/)?.[1];
-                  const version = versions[versionRef];
-
-                  if (group && name && version) {
-                      console.log(`Analyzing ${group}:${name}:${version}...`);
-                      try {
-                          const response = await axios.get(`https://search.maven.org/solrsearch/select?q=g:"${group}" AND a:"${name}"&rows=1`);
-                          const doc = response.data.response.docs[0];
-                          const license = doc?.licenses?.[0] || "Unknown";
-                          const mavenUrl = `https://mvnrepository.com/artifact/${group}/${name}`;
-                          const copyleft = isCopyleftLicense(license);
-
-                          results.push({
-                              group,
-                              name,
-                              version,
-                              license,
-                              detailsUrl: mavenUrl,
-                              copyleft,
-                              type: "Gradle"
-                          });
-                      } catch (error) {
-                          console.error(`Error fetching details for ${group}:${name}:${version}:`, error.message);
-                      }
-                  }
-              }
-
               return { results, message: "" };
           }
 
           async function generateHtmlReport() {
-              const logoUrl = "https://home.solwerindia.com/_next/static/media/logo.e8b7d2b2.png";
-              const repoName = process.env.GITHUB_REPOSITORY?.split('/')[1] || "Repository";
-
-              const gradleAnalysis = await analyzeGradleDependencies();
               const pythonAnalysis = await analyzePythonDependencies();
 
               const htmlContent = `
@@ -228,7 +145,6 @@ jobs:
                           th, td {
                               border: 1px solid #ddd;
                               padding: 8px;
-                              text-align: left;
                           }
                           th {
                               background-color: #f2f2f2;
@@ -241,37 +157,23 @@ jobs:
                               background-color: #d4edda;
                               color: #155724;
                           }
-                          .logo {
-                              display: block;
-                              margin: 0 auto;
-                              width: 200px;
-                          }
-                          h1 {
-                              text-align: center;
-                          }
                       </style>
                   </head>
                   <body>
-                      <img src="${logoUrl}" alt="Logo" class="logo" />
-                      <h1>Dependency License Report for ${repoName}</h1>
+                      <h1>Dependency License Report</h1>
 
-                      <h2>Gradle Dependencies</h2>
-                      ${gradleAnalysis.message ? `<p>${gradleAnalysis.message}</p>` : ""}
+                      <h2>Python Dependencies</h2>
                       <table>
                           <tr>
-                              <th>Group</th>
-                              <th>Artifact</th>
-                              <th>Version</th>
+                              <th>Package</th>
                               <th>License</th>
                               <th>Details</th>
                           </tr>
-                          ${gradleAnalysis.results.map(result => `
-                              <tr class="${result.copyleft ? 'copyleft' : 'non-copyleft'}">
-                                  <td>${result.group}</td>
-                                  <td>${result.name}</td>
-                                  <td>${result.version}</td>
-                                  <td>${result.license}</td>
-                                  <td><a href="${result.detailsUrl}" target="_blank">View Details</a></td>
+                          ${pythonAnalysis.results.map(dep => `
+                              <tr class="${dep.copyleft ? 'copyleft' : 'non-copyleft'}">
+                                  <td>${dep.packageName}</td>
+                                  <td>${dep.license}</td>
+                                  <td><a href="${dep.detailsUrl}" target="_blank">Details</a></td>
                               </tr>
                           `).join('')}
                       </table>
@@ -289,7 +191,7 @@ jobs:
           # Run the script
           node analyze-licenses.js
 
-      # Step 7: Upload HTML Report as an Artifact
+      # Step 8: Upload HTML Report as an Artifact
       - name: Upload License Report
         uses: actions/upload-artifact@v4
         with:
