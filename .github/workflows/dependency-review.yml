@@ -39,6 +39,7 @@ jobs:
               "net/http"
               "os"
               "path/filepath"
+              "regexp"
               "strings"
           )
 
@@ -137,6 +138,22 @@ jobs:
                           Details:  fmt.Sprintf("https://pypi.org/project/%s", name),
                       })
                   }
+              } else if packageType == "kotlin" {
+                  lines := strings.Split(string(content), "\n")
+                  for _, line := range lines {
+                      if match, _ := regexp.MatchString(`\w+\s*=\s*["'].*["']`, line); match {
+                          parts := strings.Split(line, "=")
+                          name := strings.TrimSpace(parts[0])
+                          version := strings.Trim(strings.TrimSpace(parts[1]), "\"'")
+                          license := fetchLicense(name, version, "kotlin")
+                          dependencies = append(dependencies, Dependency{
+                              Package:  name,
+                              Version:  version,
+                              License:  license,
+                              Details:  fmt.Sprintf("https://central.sonatype.com/artifact/%s/%s", name, version),
+                          })
+                      }
+                  }
               }
               return dependencies
           }
@@ -192,12 +209,12 @@ jobs:
 
               nodeDeps := parseDependencies(nodeFile, "node")
               pythonDeps := parseDependencies(pythonFile, "python")
-              // Add logic for Kotlin dependencies if necessary
+              kotlinDeps := parseDependencies(kotlinFile, "kotlin")
 
               report := Report{
                   NodeDependencies:    nodeDeps,
                   PythonDependencies:  pythonDeps,
-                  KotlinDependencies:  nil, // Add Kotlin logic
+                  KotlinDependencies:  kotlinDeps,
               }
               generateHTMLReport(report)
           }
