@@ -28,20 +28,21 @@ jobs:
         run: |
           mkdir -p license-checker
           cd license-checker
-          # Add Go code
+          # Write the Go source code
           cat << 'EOF' > main.go
           package main
 
           import (
+              "encoding/json"
               "fmt"
               "io/fs"
               "net/http"
               "os"
               "path/filepath"
               "strings"
-              "encoding/json"
           )
 
+          // Dependency holds the details for a dependency.
           type Dependency struct {
               Name     string
               License  string
@@ -49,8 +50,31 @@ jobs:
               Copyleft bool
           }
 
-          var copyleftLicenses = []string{"GPL", "LGPL", "AGPL", "MPL", "CC-BY-SA", "EPL", "OFL", "CPL", "OSL", "APL"}
+          // Expanded list of copyleft license keywords for detection.
+          var copyleftLicenses = []string{
+              "GPL",
+              "GNU GENERAL PUBLIC LICENSE",
+              "LGPL",
+              "GNU LESSER GENERAL PUBLIC LICENSE",
+              "AGPL",
+              "GNU AFFERO GENERAL PUBLIC LICENSE",
+              "MPL",
+              "MOZILLA PUBLIC LICENSE",
+              "CC-BY-SA",
+              "CREATIVE COMMONS ATTRIBUTION-SHAREALIKE",
+              "EPL",
+              "ECLIPSE PUBLIC LICENSE",
+              "OFL",
+              "OPEN FONT LICENSE",
+              "CPL",
+              "COMMON PUBLIC LICENSE",
+              "OSL",
+              "OPEN SOFTWARE LICENSE",
+              "APL",
+              "ACADEMIC PUBLIC LICENSE",
+          }
 
+          // isCopyleftLicense returns true if the license string contains any copyleft keyword.
           func isCopyleftLicense(license string) bool {
               license = strings.ToUpper(license)
               for _, copyleft := range copyleftLicenses {
@@ -62,19 +86,23 @@ jobs:
           }
 
           func main() {
+              // Locate dependency files.
               nodeFile := findFile(".", "package.json")
               pythonFile := findFile(".", "requirements.txt")
               if pythonFile == "" {
                   pythonFile = findFile(".", "requirement.txt")
               }
 
+              // Parse dependencies.
               nodeDeps := parseNodeDependencies(nodeFile)
               pythonDeps := parsePythonDependencies(pythonFile)
 
+              // Generate the HTML report.
               generateHTMLReport(nodeDeps, pythonDeps)
               fmt.Println("Dependency license report generated: dependency-license-report.html")
           }
 
+          // findFile searches for the given target file starting at root.
           func findFile(root, target string) string {
               var found string
               filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
@@ -90,6 +118,7 @@ jobs:
               return found
           }
 
+          // parseNodeDependencies reads and parses dependencies from package.json.
           func parseNodeDependencies(filePath string) []Dependency {
               if filePath == "" {
                   fmt.Println("No Node.js dependencies found.")
@@ -127,6 +156,7 @@ jobs:
               return result
           }
 
+          // fetchNodeLicense retrieves the license for a Node.js package from the npm registry.
           func fetchNodeLicense(pkgName string) (string, string) {
               url := fmt.Sprintf("https://registry.npmjs.org/%s", pkgName)
               resp, err := http.Get(url)
@@ -136,7 +166,9 @@ jobs:
               defer resp.Body.Close()
 
               var data map[string]interface{}
-              json.NewDecoder(resp.Body).Decode(&data)
+              if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+                  return "Unknown", url
+              }
 
               latestTag, ok := data["dist-tags"].(map[string]interface{})["latest"].(string)
               if !ok {
@@ -161,6 +193,7 @@ jobs:
               return license, fmt.Sprintf("https://www.npmjs.com/package/%s", pkgName)
           }
 
+          // parsePythonDependencies reads and parses dependencies from requirements.txt.
           func parsePythonDependencies(filePath string) []Dependency {
               if filePath == "" {
                   fmt.Println("No Python dependencies found.")
@@ -191,6 +224,7 @@ jobs:
               return result
           }
 
+          // fetchPythonLicense retrieves the license for a Python package from PyPI.
           func fetchPythonLicense(pkgName string) (string, string) {
               url := fmt.Sprintf("https://pypi.org/pypi/%s/json", pkgName)
               resp, err := http.Get(url)
@@ -200,7 +234,9 @@ jobs:
               defer resp.Body.Close()
 
               var data map[string]interface{}
-              json.NewDecoder(resp.Body).Decode(&data)
+              if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+                  return "Unknown", url
+              }
 
               info, ok := data["info"].(map[string]interface{})
               if !ok {
@@ -223,6 +259,7 @@ jobs:
               return license, url
           }
 
+          // generateHTMLReport creates the HTML file for the dependency license report.
           func generateHTMLReport(nodeDeps, pythonDeps []Dependency) {
               htmlContent := `<!DOCTYPE html>
               <html>
@@ -230,10 +267,11 @@ jobs:
                   <title>Dependency License Report</title>
                   <style>
                       table { width: 100%; border-collapse: collapse; }
-                      th, td { border: 1px solid #ddd; padding: 8px; }
+                      th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
                       th { background-color: #f2f2f2; }
                       .copyleft { background-color: #f8d7da; color: #721c24; }
                       .non-copyleft { background-color: #d4edda; color: #155724; }
+                      .unknown { background-color: #fff3cd; color: #856404; }
                   </style>
               </head>
               <body>
@@ -248,6 +286,7 @@ jobs:
               os.WriteFile("dependency-license-report.html", []byte(htmlContent), 0644)
           }
 
+          // generateTable creates an HTML table for a list of dependencies.
           func generateTable(dependencies []Dependency) string {
               if len(dependencies) == 0 {
                   return "<p>No dependencies found.</p>"
@@ -262,7 +301,9 @@ jobs:
 
               for _, dep := range dependencies {
                   class := "non-copyleft"
-                  if dep.Copyleft {
+                  if dep.License == "Unknown" {
+                      class = "unknown"
+                  } else if dep.Copyleft {
                       class = "copyleft"
                   }
                   table += fmt.Sprintf(`<tr class="%s">
