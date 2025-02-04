@@ -150,6 +150,8 @@ jobs:
                   if !ok {
                       versionStr = "Unknown"
                   }
+                  // Remove leading caret (^) if present
+                  versionStr = strings.TrimPrefix(versionStr, "^")
                   license, details := fetchNodeLicense(name)
                   result = append(result, Dependency{
                       Name:     name,
