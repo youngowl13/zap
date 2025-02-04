@@ -28,7 +28,7 @@ jobs:
         run: |
           mkdir -p license-checker
           cd license-checker
-          # Write the Go source code
+          # Write the Go source code with version details extraction and dual Python file support
           cat << 'EOF' > main.go
           package main
 
@@ -45,6 +45,7 @@ jobs:
           // Dependency holds the details for a dependency.
           type Dependency struct {
               Name     string
+              Version  string
               License  string
               Details  string
               Copyleft bool
@@ -144,10 +145,15 @@ jobs:
                   return nil
               }
 
-              for name := range dependencies {
+              for name, ver := range dependencies {
+                  versionStr, ok := ver.(string)
+                  if !ok {
+                      versionStr = "Unknown"
+                  }
                   license, details := fetchNodeLicense(name)
                   result = append(result, Dependency{
                       Name:     name,
+                      Version:  versionStr,
                       License:  license,
                       Details:  details,
                       Copyleft: isCopyleftLicense(license),
@@ -193,7 +199,7 @@ jobs:
               return license, fmt.Sprintf("https://www.npmjs.com/package/%s", pkgName)
           }
 
-          // parsePythonDependencies reads and parses dependencies from requirements.txt.
+          // parsePythonDependencies reads and parses dependencies from requirements.txt or requirement.txt.
           func parsePythonDependencies(filePath string) []Dependency {
               if filePath == "" {
                   fmt.Println("No Python dependencies found.")
@@ -203,7 +209,7 @@ jobs:
               var result []Dependency
               file, err := os.ReadFile(filePath)
               if err != nil {
-                  fmt.Println("Error reading requirements.txt:", err)
+                  fmt.Println("Error reading requirements file:", err)
                   return nil
               }
 
@@ -212,10 +218,16 @@ jobs:
                   if line == "" {
                       continue
                   }
-                  pkg := strings.Split(line, "==")[0]
-                  license, details := fetchPythonLicense(pkg)
+                  parts := strings.Split(line, "==")
+                  pkgName := parts[0]
+                  versionStr := "Unknown"
+                  if len(parts) > 1 {
+                      versionStr = parts[1]
+                  }
+                  license, details := fetchPythonLicense(pkgName)
                   result = append(result, Dependency{
-                      Name:     pkg,
+                      Name:     pkgName,
+                      Version:  versionStr,
                       License:  license,
                       Details:  details,
                       Copyleft: isCopyleftLicense(license),
@@ -295,6 +307,7 @@ jobs:
               table := `<table>
               <tr>
                   <th>Package</th>
+                  <th>Version</th>
                   <th>License</th>
                   <th>Details</th>
               </tr>`
@@ -309,8 +322,9 @@ jobs:
                   table += fmt.Sprintf(`<tr class="%s">
                       <td>%s</td>
                       <td>%s</td>
+                      <td>%s</td>
                       <td><a href="%s" target="_blank">View Details</a></td>
-                  </tr>`, class, dep.Name, dep.License, dep.Details)
+                  </tr>`, class, dep.Name, dep.Version, dep.License, dep.Details)
               }
 
               table += "</table>"
