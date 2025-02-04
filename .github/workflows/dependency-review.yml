@@ -43,9 +43,9 @@ jobs:
           )
 
           type Dependency struct {
-              Name    string
-              License string
-              Details string
+              Name     string
+              License  string
+              Details  string
               Copyleft bool
           }
 
@@ -67,13 +67,11 @@ jobs:
               if pythonFile == "" {
                   pythonFile = findFile(".", "requirement.txt")
               }
-              kotlinFile := findFile(".", "libs.versions.toml")
 
               nodeDeps := parseNodeDependencies(nodeFile)
               pythonDeps := parsePythonDependencies(pythonFile)
-              kotlinDeps := parseKotlinDependencies(kotlinFile)
 
-              generateHTMLReport(nodeDeps, pythonDeps, kotlinDeps)
+              generateHTMLReport(nodeDeps, pythonDeps)
               fmt.Println("Dependency license report generated: dependency-license-report.html")
           }
 
@@ -120,9 +118,9 @@ jobs:
               for name := range dependencies {
                   license, details := fetchNodeLicense(name)
                   result = append(result, Dependency{
-                      Name:    name,
-                      License: license,
-                      Details: details,
+                      Name:     name,
+                      License:  license,
+                      Details:  details,
                       Copyleft: isCopyleftLicense(license),
                   })
               }
@@ -184,9 +182,9 @@ jobs:
                   pkg := strings.Split(line, "==")[0]
                   license, details := fetchPythonLicense(pkg)
                   result = append(result, Dependency{
-                      Name:    pkg,
-                      License: license,
-                      Details: details,
+                      Name:     pkg,
+                      License:  license,
+                      Details:  details,
                       Copyleft: isCopyleftLicense(license),
                   })
               }
@@ -225,53 +223,7 @@ jobs:
               return license, url
           }
 
-          func parseKotlinDependencies(filePath string) []Dependency {
-              if filePath == "" {
-                  fmt.Println("No Kotlin dependencies found.")
-                  return nil
-              }
-
-              var result []Dependency
-              file, err := os.ReadFile(filePath)
-              if err != nil {
-                  fmt.Println("Error reading libs.versions.toml:", err)
-                  return nil
-              }
-
-              lines := strings.Split(string(file), "\n")
-              for _, line := range lines {
-                  if !strings.Contains(line, "=") {
-                      continue
-                  }
-                  parts := strings.Split(line, "=")
-                  pkg := strings.TrimSpace(parts[0])
-                  license, details := fetchKotlinLicense(pkg)
-                  result = append(result, Dependency{
-                      Name:    pkg,
-                      License: license,
-                      Details: details,
-                      Copyleft: isCopyleftLicense(license),
-                  })
-              }
-              return result
-          }
-
-          func fetchKotlinLicense(pkgName string) (string, string) {
-              // Use the GitHub repository URL to fetch license details for Kotlin dependencies
-              repo := fmt.Sprintf("https://github.com/%s", pkgName) // Assuming library is hosted on GitHub
-              resp, err := http.Get(repo + "/blob/main/LICENSE")
-              if err != nil {
-                  return "Unknown", repo
-              }
-              defer resp.Body.Close()
-
-              if resp.StatusCode == http.StatusOK {
-                  return "Apache-2.0", repo
-              }
-              return "Unknown", repo
-          }
-
-          func generateHTMLReport(nodeDeps, pythonDeps, kotlinDeps []Dependency) {
+          func generateHTMLReport(nodeDeps, pythonDeps []Dependency) {
               htmlContent := `<!DOCTYPE html>
               <html>
               <head>
@@ -290,8 +242,6 @@ jobs:
                   generateTable(nodeDeps) +
                   `<h2>Python Dependencies</h2>` +
                   generateTable(pythonDeps) +
-                  `<h2>Kotlin Dependencies</h2>` +
-                  generateTable(kotlinDeps) +
                   `</body>
               </html>`
 
